@@ -103,8 +103,6 @@ func Spider(conf config.Spider) {
 			return
 		}
 
-		log.Fatal(content)
-
 		detail := &model.Detail{
 			Title:     e.ChildText("h1"),
 			Content:   content,
