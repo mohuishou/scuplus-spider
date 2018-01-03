@@ -15,8 +15,6 @@ var urls = map[string]string{
 	"热门": "hot",
 }
 
-var tryCount = 0
-
 //Item scuinfo 单条数据
 type Item struct {
 	ID           int    `json:"id"`
@@ -46,6 +44,8 @@ func spider(conf config.Spider) {
 		log.Fatal("[E]: 不存在这个key")
 	}
 	url := fmt.Sprintf("http://scuinfo.com/api/%s?pageSize=15", urls[conf.Key])
+
+	tryCount := 0
 
 	c := colly.NewCollector()
 
@@ -92,5 +92,6 @@ func spider(conf config.Spider) {
 
 // 保存数据
 func save(item Item) {
+	// 处理tag
 	log.Info("保存一条数据:id-", item.ID)
 }
