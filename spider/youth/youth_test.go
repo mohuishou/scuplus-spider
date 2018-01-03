@@ -20,7 +20,7 @@ func Test_spider(t *testing.T) {
 				conf: config.Spider{
 					IsNew:     true,
 					Key:       "院系风采",
-					Second:    3600 * 48,
+					Second:    3600 * 24 * 10,
 					MaxTryNum: 10,
 				},
 			},
@@ -28,7 +28,7 @@ func Test_spider(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			spider(tt.args.conf)
+			Spider(tt.args.conf)
 		})
 	}
 }

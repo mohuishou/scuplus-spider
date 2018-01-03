@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/mohuishou/scuplus-spider/model"
+	"github.com/mohuishou/scuplus-spider/spider"
 
 	"github.com/mohuishou/scuplus-spider/log"
 
@@ -21,7 +22,7 @@ var urls = map[string]string{
 	"院系风采": "courtyard-style",
 }
 
-func spider(conf config.Spider) {
+func Spider(conf config.Spider) {
 	if _, ok := urls[conf.Key]; !ok {
 		log.Fatal("[E]: 不存在这个key")
 	}
@@ -91,11 +92,18 @@ func spider(conf config.Spider) {
 			createdAt = t.Unix()
 		}
 
+		// content 替换链接 a,img
+		contentDom := e.DOM.Find(".content-text")
+		spider.LinkHandle(contentDom, domain)
+
 		// 获取正文
-		content, err := e.DOM.Find(".content-text").Html()
+		content, err := contentDom.Html()
 		if err != nil {
 			log.Error("获取内容页失败：", err.Error())
+			return
 		}
+
+		log.Fatal(content)
 
 		detail := &model.Detail{
 			Title:     e.ChildText("h1"),

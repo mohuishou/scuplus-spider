@@ -8,6 +8,10 @@ import (
 	"strings"
 	"time"
 
+	"github.com/mohuishou/scuplus-spider/spider"
+
+	"github.com/PuerkitoBio/goquery"
+
 	"github.com/mohuishou/scuplus-spider/model"
 
 	"github.com/mohuishou/scuplus-spider/log"
@@ -26,7 +30,7 @@ var urls = map[string]string{
 	"新闻": "moreNews",
 }
 
-func spider(conf config.Spider) {
+func Spider(conf config.Spider) {
 	if _, ok := urls[conf.Key]; !ok {
 		log.Fatal("[E]: 不存在这个key")
 	}
@@ -115,6 +119,17 @@ func spider(conf config.Spider) {
 		// 获取正文
 		content := e.ChildAttr("#news_content", "value")
 		content = html.UnescapeString(content)
+		doc, err := goquery.NewDocumentFromReader(strings.NewReader(content))
+		if err != nil {
+			log.Error("正文获取错误：", err)
+			return
+		}
+		spider.LinkHandle(doc.Selection, domain)
+		content, err = doc.Html()
+		if err != nil {
+			log.Error("正文获取错误：", err)
+			return
+		}
 
 		detail := &model.Detail{
 			Title:     e.ChildText("table:nth-child(3) > tbody > tr:nth-child(2) > td > b"),
