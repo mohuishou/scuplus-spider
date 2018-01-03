@@ -23,7 +23,7 @@ const maxPage = 226
 
 var urls = map[string]string{
 	"公告": "moreNotice",
-	"新闻": "news-group",
+	"新闻": "moreNews",
 }
 
 func spider(conf config.Spider) {
