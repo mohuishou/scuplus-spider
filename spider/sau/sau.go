@@ -1,10 +1,8 @@
-package jwc
+package sau
 
 import (
 	"fmt"
-	"html"
 	"regexp"
-	"strconv"
 	"strings"
 	"time"
 
@@ -16,14 +14,14 @@ import (
 	"github.com/mohuishou/scuplus-spider/config"
 )
 
-const domain = "http://jwc.scu.edu.cn/jwc/"
+const domain = "http://sau.scu.edu.cn"
 
 // 最大页码，由于全量数据一般只执行一次，所以直接写死
 const maxPage = 226
 
 var urls = map[string]string{
-	"公告": "moreNotice",
-	"新闻": "moreNews",
+	"公告": "/chronicle/notice",
+	"新闻": "/club/clubnews",
 }
 
 func spider(conf config.Spider) {
@@ -32,7 +30,7 @@ func spider(conf config.Spider) {
 	}
 
 	// 入口链接
-	url := fmt.Sprintf("http://jwc.scu.edu.cn/jwc/%s.action", urls[conf.Key])
+	url := domain + urls[conf.Key]
 
 	tryCount := 0
 
@@ -41,7 +39,11 @@ func spider(conf config.Spider) {
 	c.Limit(&colly.LimitRule{DomainGlob: "*", Parallelism: 5})
 
 	// 获取列表页面的所有列表
-	c.OnHTML("#news_list > table > tbody > tr", func(e *colly.HTMLElement) {
+	c.OnHTML("body > table > tbody > tr:nth-child(3) > td > table > tbody > tr:nth-child(3) > td > table > tbody > tr", func(e *colly.HTMLElement) {
+
+		if e.ChildText("td:nth-child(2)") == "" {
+			return
+		}
 
 		// 判断是否为最新的页面，如果不是则丢弃
 		if conf.IsNew {
@@ -52,9 +54,7 @@ func spider(conf config.Spider) {
 			}
 
 			// 获取发布时间
-			r, _ := regexp.Compile(`\d{4}\.\d{1,2}\.\d{1,2}`)
-			createdStr := r.FindString(e.ChildText("td:nth-child(2)"))
-			t, err := time.Parse("2006.01.02", createdStr)
+			t, err := time.Parse("2006-01-02", e.ChildText("td:nth-child(2)"))
 			if err != nil {
 				log.Info("时间转换失败：", err.Error())
 				return
@@ -72,7 +72,7 @@ func spider(conf config.Spider) {
 	})
 
 	// 列表页： 获取下一页
-	c.OnHTML("#pagenext", func(e *colly.HTMLElement) {
+	c.OnHTML("#badoopager", func(e *colly.HTMLElement) {
 
 		// 如果仅需获取最新内容，判断是否已经达到最大尝试次数
 		if tryCount > conf.MaxTryNum {
@@ -80,32 +80,33 @@ func spider(conf config.Spider) {
 			return
 		}
 
-		// 获取当前页码
-		pageNow, err := strconv.Atoi(e.Attr("value"))
+		pageHTML, err := e.DOM.Html()
 		if err != nil {
-			log.Error("当前页码获取错误：", err.Error())
+			log.Error("页码获取错误：", err)
+			return
 		}
 
 		// 发现下一列表页
-		if pageNow < maxPage {
-			go e.Request.Visit(fmt.Sprintf("%s%s.action?url=%s.action&type=2&keyWord=&pager.pageNow=%d", domain, urls[conf.Key], urls[conf.Key], pageNow+1))
+		r, _ := regexp.Compile(`(\d+)">下一页</a>`)
+		s := r.FindAllStringSubmatch(pageHTML, -1)
+		if s != nil && len(s[0]) == 2 {
+			go e.Request.Visit(fmt.Sprintf("%s?pageid=%s", url, s[0][1]))
 		}
-
 	})
 
 	// 获取内容页信息
 	c.OnHTML("body", func(e *colly.HTMLElement) {
 		//判断是否是内容页
-		if !strings.Contains(e.Request.URL.Path, "newsShow") {
+		if !strings.Contains(e.Request.URL.Path, "newsDetail") {
 			return
 		}
 
 		// 获取发布时间
-		r, _ := regexp.Compile(`\d{4}\.\d{1,2}\.\d{1,2}`)
-		createdStr := r.FindString(e.ChildText("table:nth-child(3) > tbody > tr:nth-child(4) > td"))
+		r, _ := regexp.Compile(`\d{4}-\d{1,2}-\d{1,2}`)
+		createdStr := r.FindString(e.ChildText("table > tbody > tr:nth-child(3) > td > table > tbody > tr:nth-child(2) > td > p"))
 		createdAt := int64(0)
 		if createdStr != "" {
-			t, err := time.Parse("2006.01.02", createdStr)
+			t, err := time.Parse("2006-01-02", createdStr)
 			if err != nil {
 				log.Error("时间转换失败：", err.Error())
 			}
@@ -113,13 +114,15 @@ func spider(conf config.Spider) {
 		}
 
 		// 获取正文
-		content := e.ChildAttr("#news_content", "value")
-		content = html.UnescapeString(content)
+		content, err := e.DOM.Find("table > tbody > tr:nth-child(3) > td > table > tbody > tr:nth-child(6) > td > div").Html()
+		if err != nil {
+			log.Error("正文获取错误: ", err.Error())
+		}
 
 		detail := &model.Detail{
-			Title:     e.ChildText("table:nth-child(3) > tbody > tr:nth-child(2) > td > b"),
+			Title:     e.ChildText("table > tbody > tr:nth-child(3) > td > table > tbody > tr:nth-child(2) > td > span"),
 			Content:   content,
-			Category:  "教务处",
+			Category:  "社团联",
 			URL:       e.Request.URL.String(),
 			CreatedAt: createdAt,
 		}
