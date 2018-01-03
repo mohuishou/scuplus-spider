@@ -16,8 +16,9 @@ import (
 const domain = "http://youth.scu.edu.cn"
 
 var urls = map[string]string{
-	"公告": "notice",
-	"新闻": "hot",
+	"公告":   "notice",
+	"团情快讯": "news-group",
+	"院系风采": "courtyard-style",
 }
 
 func spider(conf config.Spider) {
@@ -103,6 +104,7 @@ func spider(conf config.Spider) {
 			URL:       e.Request.URL.String(),
 			CreatedAt: createdAt,
 		}
+
 		detail.Create()
 	})
 
