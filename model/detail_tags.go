@@ -3,6 +3,6 @@ package model
 // DetailTag .
 type DetailTag struct {
 	Model
-	DetailID uint
-	TagID    uint
+	DetailID uint `gorm:"primary_key:no"`
+	TagID    uint `gorm:"primary_key:no"`
 }

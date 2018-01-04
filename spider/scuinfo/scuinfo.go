@@ -83,7 +83,7 @@ func spider(conf config.Spider) {
 				Category: "scuinfo",
 				URL:      resp.Request.URL.String(),
 				Model:    model.Model{CreatedAt: item.Date},
-				Tags:     []model.Tag{model.Tag{Name: urls[conf.Key]}},
+				Tags:     []model.Tag{model.Tag{Name: conf.Key}},
 			}
 
 			detail.Create()

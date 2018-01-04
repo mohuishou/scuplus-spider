@@ -3,6 +3,8 @@ package model
 import (
 	"fmt"
 
+	"github.com/mohuishou/scuplus-spider/config"
+
 	"github.com/jinzhu/gorm"
 	_ "github.com/jinzhu/gorm/dialects/mysql" // mysql驱动
 	"github.com/mohuishou/scuplus-spider/log"
@@ -20,8 +22,12 @@ type Model struct {
 
 // init 数据库初始化
 func initDB() {
+	// 获取配置
+	conf := config.GetConfig().Mysql
+
+	// 初始化连接
 	var err error
-	db, err = gorm.Open("mysql", fmt.Sprintf("%s:%s@tcp(%s:%s)/%s?charset=utf8&parseTime=True&loc=Local", "root", "123456", "localhost", "3306", "scuplus-spider"))
+	db, err = gorm.Open("mysql", fmt.Sprintf("%s:%s@tcp(%s:%s)/%s?charset=utf8&parseTime=True&loc=Local", conf.User, conf.Password, conf.Host, conf.Port, conf.DB))
 	if err != nil {
 		log.Fatal("数据库连接错误：", err)
 	}

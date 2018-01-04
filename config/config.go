@@ -1,5 +1,12 @@
 package config
 
+import (
+	"os"
+
+	"github.com/BurntSushi/toml"
+	"github.com/mohuishou/scuplus-spider/log"
+)
+
 // Spider 爬虫设置
 type Spider struct {
 	MaxTryNum int      //最大尝试次数
@@ -11,7 +18,7 @@ type Spider struct {
 
 // Mysql 配置
 type Mysql struct {
-	Host     string
+	Host     string `toml:"host"`
 	User     string
 	Password string
 	DB       string
@@ -20,15 +27,34 @@ type Mysql struct {
 
 // Config 对应config.yml文件的位置
 type Config struct {
-	Mysql
+	Mysql `toml:"mysql"`
 }
 
-var config *Config
+var config Config
 
 // GetConfig 获取config
-func GetConfig() *Config {
-	if config == nil {
+func GetConfig() Config {
 
+	if config.Host == "" {
+		// 获取当前环境
+		env := os.Getenv("SCUPLUS_ENV")
+		if env == "" {
+			env = "develop"
+		}
+
+		// 默认配置文件在同级目录
+		filepath := "config.toml"
+
+		// 根据环境变量获取配置文件目录
+		switch env {
+		case "test":
+			filepath = os.Getenv("GOPATH") + "/src/github.com/mohuishou/scuplus-spider/config/" + filepath
+		}
+
+		// 解析配置文件
+		if _, err := toml.DecodeFile(filepath, &config); err != nil {
+			log.Fatal("配置文件读取失败！", err)
+		}
 	}
 	return config
 }

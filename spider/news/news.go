@@ -122,7 +122,7 @@ func Spider(conf config.Spider) {
 		title := e.ChildText("#__01 > tbody > tr:nth-child(9) > td > table > tbody > tr > td > span")
 
 		// 获取标签
-		tags := spider.GetTag(title, []string{urls[conf.Key]})
+		tags := spider.GetTag(title, []string{conf.Key})
 
 		detail := &model.Detail{
 			Title:    title,

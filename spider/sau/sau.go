@@ -128,7 +128,7 @@ func Spider(conf config.Spider) {
 		// 获取标题
 		title := e.ChildText("table > tbody > tr:nth-child(3) > td > table > tbody > tr:nth-child(2) > td > span")
 		// 获取标签
-		tags := spider.GetTag(title, []string{urls[conf.Key]})
+		tags := spider.GetTag(title, []string{conf.Key})
 
 		detail := &model.Detail{
 			Title:    title,
