@@ -130,9 +130,10 @@ func Spider(conf config.Spider) {
 			Category:  "四川大学新闻网",
 			URL:       e.Request.URL.String(),
 			CreatedAt: createdAt,
+			Tags:      tags,
 		}
 
-		detail.Create(tags)
+		detail.Create()
 	})
 
 	c.Visit(url)

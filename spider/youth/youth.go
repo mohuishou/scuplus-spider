@@ -114,9 +114,10 @@ func Spider(conf config.Spider) {
 			Category:  "青春川大",
 			URL:       e.Request.URL.String(),
 			CreatedAt: createdAt,
+			Tags:      tags,
 		}
 
-		detail.Create(tags)
+		detail.Create()
 	})
 
 	c.Visit(url)

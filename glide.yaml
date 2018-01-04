@@ -1,3 +1,5 @@
 package: github.com/mohuishou/scuplus-spider
 import:
 - package: github.com/gocolly/colly
+- package: github.com/jinzhu/gorm
+  version: ~1.0.0

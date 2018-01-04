@@ -1,5 +1,5 @@
-hash: 1be347344b9faf6c31109aa9967a71f0c4f32a5166194d7e09ac45ae4a85ca7b
-updated: 2018-01-02T20:10:14.200448507+08:00
+hash: 7ec3e749ead93668ec8d0ea8ba55b9a6e9e305309beb2bb7f32c7e645035c185
+updated: 2018-01-04T14:47:05.333443165+08:00
 imports:
 - name: github.com/andybalholm/cascadia
   version: 349dd0209470eabd9514242c688c403c0926d266
@@ -21,6 +21,8 @@ imports:
   version: 1e59b77b52bf8e4b449a57e6f79f21226d571845
   subpackages:
   - proto
+- name: github.com/jinzhu/gorm
+  version: 5174cc5c242a728b435ea2be8a2f7f998e15429b
 - name: github.com/kennygrant/sanitize
   version: 2e6820834a1f36c626bf19a253b7d3cc060e9b8b
 - name: github.com/PuerkitoBio/goquery

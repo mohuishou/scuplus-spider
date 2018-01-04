@@ -83,9 +83,10 @@ func spider(conf config.Spider) {
 				Category:  "scuinfo",
 				URL:       resp.Request.URL.String(),
 				CreatedAt: item.Date,
+				Tags:      []model.Tag{model.Tag{Name: urls[conf.Key]}},
 			}
 
-			detail.Create([]string{urls[conf.Key]})
+			detail.Create()
 		}
 
 		// 发现新的页面
