@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/mohuishou/scuplus-spider/model"
+
 	"github.com/gocolly/colly"
 	"github.com/mohuishou/scuplus-spider/config"
 	"github.com/mohuishou/scuplus-spider/log"
@@ -75,7 +77,15 @@ func spider(conf config.Spider) {
 			}
 
 			// 数据持久化
-			save(item)
+			detail := &model.Detail{
+				Title:     item.Nickname,
+				Content:   item.Content,
+				Category:  "scuinfo",
+				URL:       resp.Request.URL.String(),
+				CreatedAt: item.Date,
+			}
+
+			detail.Create([]string{urls[conf.Key]})
 		}
 
 		// 发现新的页面
@@ -88,10 +98,4 @@ func spider(conf config.Spider) {
 	})
 
 	c.Visit(url)
-}
-
-// 保存数据
-func save(item Item) {
-	// 处理tag
-	log.Info("保存一条数据:id-", item.ID)
 }
