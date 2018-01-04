@@ -20,7 +20,7 @@ func Test_spider(t *testing.T) {
 				conf: config.Spider{
 					IsNew:     true,
 					Key:       "院系风采",
-					Second:    3600 * 24 * 10,
+					Second:    3600 * 24 * 9,
 					MaxTryNum: 10,
 				},
 			},

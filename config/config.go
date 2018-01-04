@@ -9,5 +9,11 @@ type Spider struct {
 	Second    int      //获取距离当前时间多少秒之内的数据，仅在最新的数据时有效
 }
 
+// Mysql 配置
 type Mysql struct {
+	Host     string
+	User     string
+	Password string
+	DB       string
+	Port     string
 }

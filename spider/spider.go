@@ -24,7 +24,7 @@ func LinkHandle(contentDom *goquery.Selection, domain string) {
 
 // GetTag 获取标签
 func GetTag(s string, tags []string) []model.Tag {
-	t := make(model.Tag, len(tags))
+	t := make([]model.Tag, len(tags))
 	for i, tag := range tags {
 		t[i] = model.Tag{Name: tag}
 	}

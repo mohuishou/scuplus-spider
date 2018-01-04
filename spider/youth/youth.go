@@ -34,6 +34,8 @@ func Spider(conf config.Spider) {
 
 	c := colly.NewCollector()
 
+	c.DetectCharset = true
+
 	c.Limit(&colly.LimitRule{DomainGlob: "*", Parallelism: 5})
 
 	// 获取列表页面的所有列表
@@ -109,12 +111,12 @@ func Spider(conf config.Spider) {
 		tags := spider.GetTag(title, []string{urls[conf.Key]})
 
 		detail := &model.Detail{
-			Title:     title,
-			Content:   content,
-			Category:  "青春川大",
-			URL:       e.Request.URL.String(),
-			CreatedAt: createdAt,
-			Tags:      tags,
+			Title:    title,
+			Content:  content,
+			Category: "青春川大",
+			URL:      e.Request.URL.String(),
+			Model:    model.Model{CreatedAt: createdAt},
+			Tags:     tags,
 		}
 
 		detail.Create()

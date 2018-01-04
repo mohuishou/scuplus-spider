@@ -78,12 +78,12 @@ func spider(conf config.Spider) {
 
 			// 数据持久化
 			detail := &model.Detail{
-				Title:     item.Nickname,
-				Content:   item.Content,
-				Category:  "scuinfo",
-				URL:       resp.Request.URL.String(),
-				CreatedAt: item.Date,
-				Tags:      []model.Tag{model.Tag{Name: urls[conf.Key]}},
+				Title:    item.Nickname,
+				Content:  item.Content,
+				Category: "scuinfo",
+				URL:      resp.Request.URL.String(),
+				Model:    model.Model{CreatedAt: item.Date},
+				Tags:     []model.Tag{model.Tag{Name: urls[conf.Key]}},
 			}
 
 			detail.Create()

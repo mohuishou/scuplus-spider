@@ -16,8 +16,10 @@ type Detail struct {
 
 // Create 新建一条文章记录
 func (d *Detail) Create() []error {
-	if errs := DB.Create(d).GetErrors(); errs != nil {
+	log.Info(d.Title)
+	if errs := DB().Create(d).GetErrors(); errs != nil {
 		log.Error(errs)
 		return errs
 	}
+	return nil
 }

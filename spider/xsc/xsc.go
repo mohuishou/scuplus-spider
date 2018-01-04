@@ -115,12 +115,12 @@ func Spider(conf config.Spider) {
 		tags := spider.GetTag(title, []string{urls[conf.Key]})
 
 		detail := &model.Detail{
-			Title:     title,
-			Content:   content,
-			Category:  "学工部",
-			URL:       e.Request.URL.String(),
-			CreatedAt: createdAt,
-			Tags:      tags,
+			Title:    title,
+			Content:  content,
+			Category: "学工部",
+			URL:      e.Request.URL.String(),
+			Model:    model.Model{CreatedAt: createdAt},
+			Tags:     tags,
 		}
 
 		detail.Create()
