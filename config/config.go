@@ -17,3 +17,18 @@ type Mysql struct {
 	DB       string
 	Port     string
 }
+
+// Config 对应config.yml文件的位置
+type Config struct {
+	Mysql
+}
+
+var config *Config
+
+// GetConfig 获取config
+func GetConfig() *Config {
+	if config == nil {
+
+	}
+	return config
+}
