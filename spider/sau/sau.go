@@ -125,15 +125,20 @@ func Spider(conf config.Spider) {
 			return
 		}
 
+		// 获取标题
+		title := e.ChildText("table > tbody > tr:nth-child(3) > td > table > tbody > tr:nth-child(2) > td > span")
+		// 获取标签
+		tags := spider.GetTag(title, []string{urls[conf.Key]})
+
 		detail := &model.Detail{
-			Title:     e.ChildText("table > tbody > tr:nth-child(3) > td > table > tbody > tr:nth-child(2) > td > span"),
+			Title:     title,
 			Content:   content,
 			Category:  "社团联",
 			URL:       e.Request.URL.String(),
 			CreatedAt: createdAt,
 		}
 
-		detail.Create()
+		detail.Create(tags)
 	})
 
 	c.Visit(url)

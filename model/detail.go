@@ -4,6 +4,7 @@ import (
 	"github.com/mohuishou/scuplus-spider/log"
 )
 
+// Detail 文章
 type Detail struct {
 	ID        int
 	CreatedAt int64
@@ -14,6 +15,7 @@ type Detail struct {
 	Category  string
 }
 
-func (d *Detail) Create() {
+// Create 新建一条文章记录
+func (d *Detail) Create(tags []string) {
 	log.Info(d.Title, d.CreatedAt, d.URL)
 }
