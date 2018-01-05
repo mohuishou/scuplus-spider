@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/mohuishou/scuplus-spider/model"
+	"github.com/mohuishou/scuplus-spider/spider"
 
 	"github.com/gocolly/colly"
 	"github.com/mohuishou/scuplus-spider/config"
@@ -40,8 +41,8 @@ type Data struct {
 	Items   []Item `json:"data"`
 }
 
-// 抓取数据
-func spider(conf config.Spider) {
+// Spider 抓取数据
+func Spider(conf config.Spider) {
 	if _, ok := urls[conf.Key]; !ok {
 		log.Fatal("[E]: 不存在这个key")
 	}
@@ -76,17 +77,27 @@ func spider(conf config.Spider) {
 				}
 			}
 
-			// 数据持久化
-			detail := &model.Detail{
-				Title:    item.Nickname,
-				Content:  item.Content,
-				Category: "scuinfo",
-				URL:      resp.Request.URL.String(),
-				Model:    model.Model{CreatedAt: item.Date},
-				Tags:     []model.Tag{model.Tag{Name: conf.Key}},
+			// 获取标签
+			tagIDs := spider.GetTagIDs(item.Content, []string{conf.Key})
+
+			createdAt := time.Unix(item.Date, item.Date*1000000)
+
+			author := item.Nickname + "-女"
+			if item.Gender == 1 {
+				author = item.Nickname + "-男"
 			}
 
-			detail.Create()
+			// 数据持久化
+			detail := &model.Detail{
+				Author:   author,
+				Title:    item.Content,
+				Content:  item.Content,
+				Category: "scuinfo",
+				URL:      fmt.Sprintf("http://scuinfo.com/#page=detail&id=%d", item.ID),
+				Model:    model.Model{CreatedAt: createdAt},
+			}
+
+			detail.Create(tagIDs)
 		}
 
 		// 发现新的页面

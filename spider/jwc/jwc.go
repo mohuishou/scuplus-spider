@@ -107,14 +107,7 @@ func Spider(conf config.Spider) {
 		// 获取发布时间
 		r, _ := regexp.Compile(`\d{4}\.\d{1,2}\.\d{1,2}`)
 		createdStr := r.FindString(e.ChildText("table:nth-child(3) > tbody > tr:nth-child(4) > td"))
-		createdAt := int64(0)
-		if createdStr != "" {
-			t, err := time.Parse("2006.01.02", createdStr)
-			if err != nil {
-				log.Error("时间转换失败：", err.Error())
-			}
-			createdAt = t.Unix()
-		}
+		createdAt := spider.StrToTime("2006-01-02 15:04", createdStr)
 
 		// 获取正文
 		content := e.ChildAttr("#news_content", "value")
@@ -135,7 +128,7 @@ func Spider(conf config.Spider) {
 		title := e.ChildText("table:nth-child(3) > tbody > tr:nth-child(2) > td > b")
 
 		// 获取标签
-		tags := spider.GetTag(title, []string{conf.Key})
+		tagIDs := spider.GetTagIDs(title, []string{conf.Key})
 
 		detail := &model.Detail{
 			Title:    title,
@@ -143,10 +136,9 @@ func Spider(conf config.Spider) {
 			Category: "教务处",
 			URL:      e.Request.URL.String(),
 			Model:    model.Model{CreatedAt: createdAt},
-			Tags:     tags,
 		}
 
-		detail.Create()
+		detail.Create(tagIDs)
 	})
 
 	c.Visit(url)

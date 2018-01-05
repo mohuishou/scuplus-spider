@@ -2,6 +2,7 @@ package spider
 
 import (
 	"strings"
+	"time"
 
 	"github.com/mohuishou/scuplus-spider/log"
 
@@ -46,4 +47,16 @@ A:
 		}
 	}
 	return ids
+}
+
+// StrToTime 字符串转时间戳
+func StrToTime(layout, val string) (t time.Time) {
+	var err error
+	if val != "" {
+		t, err = time.Parse(layout, val)
+		if err != nil {
+			log.Error("时间转换失败：", err.Error())
+		}
+	}
+	return t
 }

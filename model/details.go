@@ -7,6 +7,7 @@ import (
 // Detail 文章
 type Detail struct {
 	Model
+	Author   string
 	Title    string `gorm:"unique_index"`
 	Content  string `gorm:"type:text;"`
 	URL      string

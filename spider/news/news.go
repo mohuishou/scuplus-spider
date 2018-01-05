@@ -98,14 +98,7 @@ func Spider(conf config.Spider) {
 		// 获取发布时间
 		r, _ := regexp.Compile(`\d{4}-\d{1,2}-\d{1,2}\s\d{2}:\d{2}`)
 		createdStr := r.FindString(e.ChildText("#__01 > tbody > tr:nth-child(10) > td > table > tbody > tr > td"))
-		createdAt := int64(0)
-		if createdStr != "" {
-			t, err := time.Parse("2006-01-02 15:04", createdStr)
-			if err != nil {
-				log.Error("时间转换失败：", err.Error())
-			}
-			createdAt = t.Unix()
-		}
+		createdAt := spider.StrToTime("2006-01-02 15:04", createdStr)
 
 		// content 替换链接 a,img
 		contentDom := e.DOM.Find("#zoom")
@@ -122,7 +115,7 @@ func Spider(conf config.Spider) {
 		title := e.ChildText("#__01 > tbody > tr:nth-child(9) > td > table > tbody > tr > td > span")
 
 		// 获取标签
-		tags := spider.GetTag(title, []string{conf.Key})
+		tagIDs := spider.GetTagIDs(title, []string{conf.Key})
 
 		detail := &model.Detail{
 			Title:    title,
@@ -130,10 +123,9 @@ func Spider(conf config.Spider) {
 			Category: "四川大学新闻网",
 			URL:      e.Request.URL.String(),
 			Model:    model.Model{CreatedAt: createdAt},
-			Tags:     tags,
 		}
 
-		detail.Create()
+		detail.Create(tagIDs)
 	})
 
 	c.Visit(url)
