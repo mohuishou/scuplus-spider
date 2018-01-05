@@ -44,7 +44,7 @@ type Data struct {
 // Spider 抓取数据
 func Spider(conf config.Spider) {
 	if _, ok := urls[conf.Key]; !ok {
-		log.Fatal("[E]: 不存在这个key")
+		log.Fatal("不存在这个key", conf)
 	}
 	url := fmt.Sprintf("http://scuinfo.com/api/%s?pageSize=15", urls[conf.Key])
 
@@ -110,4 +110,9 @@ func Spider(conf config.Spider) {
 	})
 
 	c.Visit(url)
+}
+
+// GetURLs 获取所有的url
+func GetURLs() map[string]string {
+	return urls
 }

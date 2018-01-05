@@ -85,7 +85,7 @@ func Spider(conf config.Spider) {
 		// 获取发布时间
 		r, _ := regexp.Compile(`\d{4}-\d{1,2}-\d{1,2}\s\d{1,2}:\d{1,2}:\d{1,2}`)
 		createdStr := r.FindString(e.ChildText(".attr"))
-		createdAt := spider.StrToTime("2006-01-02 15:04", createdStr)
+		createdAt := spider.StrToTime("2006-01-02 15:04:05", createdStr)
 
 		// content 替换链接 a,img
 		contentDom := e.DOM.Find(".content-text")
@@ -117,4 +117,9 @@ func Spider(conf config.Spider) {
 	c.Visit(url)
 
 	c.Wait()
+}
+
+// GetURLs 获取所有的url
+func GetURLs() map[string]string {
+	return urls
 }

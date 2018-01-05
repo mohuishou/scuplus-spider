@@ -8,7 +8,7 @@ import (
 type Detail struct {
 	Model
 	Author   string
-	Title    string `gorm:"unique_index"`
+	Title    string `gorm:"index"`
 	Content  string `gorm:"type:text;"`
 	URL      string
 	Category string

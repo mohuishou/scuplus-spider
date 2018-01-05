@@ -32,7 +32,7 @@ var urls = map[string]string{
 
 func Spider(conf config.Spider) {
 	if _, ok := urls[conf.Key]; !ok {
-		log.Fatal("[E]: 不存在这个key")
+		log.Fatal("不存在这个key", conf)
 	}
 
 	// 入口链接
@@ -107,7 +107,7 @@ func Spider(conf config.Spider) {
 		// 获取发布时间
 		r, _ := regexp.Compile(`\d{4}\.\d{1,2}\.\d{1,2}`)
 		createdStr := r.FindString(e.ChildText("table:nth-child(3) > tbody > tr:nth-child(4) > td"))
-		createdAt := spider.StrToTime("2006-01-02 15:04", createdStr)
+		createdAt := spider.StrToTime("2006.01.02", createdStr)
 
 		// 获取正文
 		content := e.ChildAttr("#news_content", "value")
@@ -144,4 +144,9 @@ func Spider(conf config.Spider) {
 	c.Visit(url)
 
 	c.Wait()
+}
+
+// GetURLs 获取所有的url
+func GetURLs() map[string]string {
+	return urls
 }

@@ -132,3 +132,8 @@ func Spider(conf config.Spider) {
 
 	c.Wait()
 }
+
+// GetURLs 获取所有的url
+func GetURLs() map[string]string {
+	return urls
+}

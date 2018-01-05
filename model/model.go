@@ -24,13 +24,13 @@ type Model struct {
 // init 数据库初始化
 func initDB() {
 	// 获取配置
-	conf := config.GetConfig().Mysql
+	conf := config.GetConfig("").Mysql
 
 	// 初始化连接
 	var err error
 	db, err = gorm.Open("mysql", fmt.Sprintf("%s:%s@tcp(%s:%s)/%s?charset=utf8&parseTime=True&loc=Local", conf.User, conf.Password, conf.Host, conf.Port, conf.DB))
 	if err != nil {
-		log.Fatal("数据库连接错误：", err)
+		log.Fatal("数据库连接错误：", err, conf)
 	}
 	db.AutoMigrate(&DetailTag{}, &Detail{}, &Tag{})
 }
@@ -40,7 +40,6 @@ func DB() *gorm.DB {
 	if db == nil {
 		initDB()
 	}
-	db.LogMode(true)
 	return db
 }
 
