@@ -3,6 +3,8 @@ package spider
 import (
 	"strings"
 
+	"github.com/mohuishou/scuplus-spider/log"
+
 	"github.com/mohuishou/scuplus-spider/model"
 
 	"github.com/PuerkitoBio/goquery"
@@ -22,17 +24,26 @@ func LinkHandle(contentDom *goquery.Selection, domain string) {
 	})
 }
 
-// GetTag 获取标签
-func GetTag(s string, tags []string) []model.Tag {
-	t := make([]model.Tag, len(tags))
-	for i, tag := range tags {
-		t[i] = model.Tag{Name: tag}
+// GetTagIDs 获取标签ids
+func GetTagIDs(s string, tags []string) []uint {
+	ids := []uint{}
+	for _, v := range tags {
+		if _, ok := model.Tags[v]; !ok {
+			log.Fatal("tag不存在：", v)
+		}
+		ids = append(ids, model.Tags[v].ID)
 	}
 
-	for _, v := range Tags {
-		if strings.Contains(s, v) {
-			t = append(t, model.Tag{Name: v})
+A:
+	for _, v := range model.Tags {
+		if strings.Contains(s, v.Name) {
+			for _, tagName := range tags {
+				if v.Name == tagName {
+					continue A
+				}
+			}
+			ids = append(ids, v.ID)
 		}
 	}
-	return t
+	return ids
 }
