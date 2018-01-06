@@ -5,3 +5,4 @@ config.yml
 config.toml
 scuplus-spider
 docker
+nohup.out

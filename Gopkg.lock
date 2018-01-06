@@ -77,6 +77,12 @@
   version = "v1.2.3"
 
 [[projects]]
+  name = "github.com/robfig/cron"
+  packages = ["."]
+  revision = "b024fc5ea0e34bc3f83d9941c8d60b0622bfaca4"
+  version = "v1"
+
+[[projects]]
   branch = "master"
   name = "github.com/saintfish/chardet"
   packages = ["."]
@@ -143,6 +149,6 @@
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "3c6bb2c218d57fef1438f2feb10aff9267e1c550b8ced2fb5d4f3c3e0d9e1539"
+  inputs-digest = "42647fb0344b9ac59186805d1cb1ada48ce2eb792d636f4047f8d59b052c728c"
   solver-name = "gps-cdcl"
   solver-version = 1
