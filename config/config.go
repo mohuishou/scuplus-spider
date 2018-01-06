@@ -29,6 +29,7 @@ type Mysql struct {
 type Config struct {
 	Mysql  `toml:"mysql"`
 	Spider `toml:"spider"`
+	Spec   string `toml:"spec"`
 }
 
 var config Config

@@ -3,14 +3,26 @@ package main
 import (
 	"sync"
 
+	"github.com/robfig/cron"
+
 	"github.com/mohuishou/scuplus-spider/config"
+	"github.com/mohuishou/scuplus-spider/spider/jwc"
+	"github.com/mohuishou/scuplus-spider/spider/news"
+	"github.com/mohuishou/scuplus-spider/spider/sau"
 	"github.com/mohuishou/scuplus-spider/spider/scuinfo"
+	"github.com/mohuishou/scuplus-spider/spider/xsc"
+	"github.com/mohuishou/scuplus-spider/spider/youth"
 )
 
 var waitgroup sync.WaitGroup
 
 func main() {
-	run(config.GetConfig("").Spider)
+	c := cron.New()
+	c.AddFunc(config.GetConfig("").Spec, func() {
+		run(config.GetConfig("").Spider)
+	})
+	c.Start()
+	select {}
 }
 
 func run(conf config.Spider) {
