@@ -3,6 +3,8 @@ package main
 import (
 	"sync"
 
+	"github.com/mohuishou/scuplus-spider/log"
+
 	"github.com/robfig/cron"
 
 	"github.com/mohuishou/scuplus-spider/config"
@@ -19,7 +21,9 @@ var waitgroup sync.WaitGroup
 func main() {
 	c := cron.New()
 	c.AddFunc(config.GetConfig("").Spec, func() {
+		log.Info("爬虫开始执行:")
 		run(config.GetConfig("").Spider)
+		log.Info("爬虫执行完毕")
 	})
 	c.Start()
 	select {}
