@@ -4,12 +4,7 @@ import (
 	"sync"
 
 	"github.com/mohuishou/scuplus-spider/config"
-	"github.com/mohuishou/scuplus-spider/spider/jwc"
-	"github.com/mohuishou/scuplus-spider/spider/news"
-	"github.com/mohuishou/scuplus-spider/spider/sau"
 	"github.com/mohuishou/scuplus-spider/spider/scuinfo"
-	"github.com/mohuishou/scuplus-spider/spider/xsc"
-	"github.com/mohuishou/scuplus-spider/spider/youth"
 )
 
 var waitgroup sync.WaitGroup

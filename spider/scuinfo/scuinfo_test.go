@@ -5,9 +5,9 @@ import "github.com/mohuishou/scuplus-spider/config"
 
 func Test_spider(t *testing.T) {
 	Spider(config.Spider{
-		IsNew:     true,
+		IsNew:     false,
 		MaxTryNum: 10,
-		Key:       "最近",
+		Key:       "热门",
 		Second:    60 * 10,
 	})
 }

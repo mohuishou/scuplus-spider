@@ -20,5 +20,5 @@ func Warn(v ...interface{}) {
 }
 
 func Fatal(v ...interface{}) {
-	log.Panic("[Error]:", v)
+	log.Fatal("[Fatal]:", v)
 }

@@ -1,6 +1,8 @@
 package model
 
 import (
+	"fmt"
+
 	"github.com/mohuishou/scuplus-spider/log"
 )
 
@@ -31,6 +33,8 @@ func (d *Detail) Create(tagIDs []uint) error {
 			return err
 		}
 	}
+
+	log.Info(fmt.Sprintf("%s %s 以保存", d.Title, d.CreatedAt.Format("2006-01-02")))
 
 	tx.Commit()
 

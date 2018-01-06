@@ -14,7 +14,7 @@ import (
 )
 
 var urls = map[string]string{
-	"最近": "posts",
+	// "最近": "posts",
 	"热门": "hot",
 }
 
@@ -51,6 +51,12 @@ func Spider(conf config.Spider) {
 	tryCount := 0
 
 	c := colly.NewCollector()
+
+	c.Limit(&colly.LimitRule{
+		DomainGlob:  "*",
+		Parallelism: 5,
+		// Delay:       1 * time.Second,
+	})
 
 	c.OnResponse(func(resp *colly.Response) {
 		data := &Data{}
