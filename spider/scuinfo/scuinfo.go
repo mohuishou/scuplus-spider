@@ -86,7 +86,7 @@ func Spider(conf config.Spider) {
 			// 获取标签
 			tagIDs := spider.GetTagIDs(item.Content, []string{conf.Key})
 
-			createdAt := time.Unix(item.Date, item.Date*1000000)
+			createdAt := time.Unix(item.Date, item.Date)
 
 			author := item.Nickname + "-女"
 			if item.Gender == 1 {
