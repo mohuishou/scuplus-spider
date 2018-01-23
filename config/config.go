@@ -59,6 +59,11 @@ func getPath(path string) string {
 		env = "develop"
 	}
 
+	path = os.Getenv("SCUPLUS_CONF")
+	if path != "" {
+		return path
+	}
+
 	// 默认配置文件在同级目录
 	filepath := "config.toml"
 
