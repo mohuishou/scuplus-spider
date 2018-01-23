@@ -1,6 +1,5 @@
 .vscode
 .idea
-vendor
 config.yml
 config.toml
 docker
