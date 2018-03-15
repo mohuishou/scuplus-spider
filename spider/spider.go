@@ -4,12 +4,21 @@ import (
 	"strings"
 	"time"
 
+	"github.com/gocolly/colly"
 	"github.com/mohuishou/scuplus-spider/log"
 
 	"github.com/mohuishou/scuplus-spider/model"
 
 	"github.com/PuerkitoBio/goquery"
 )
+
+// NewCollector 新建一个Collector
+func NewCollector() *colly.Collector {
+	c := colly.NewCollector()
+	c.DetectCharset = true
+	c.Limit(&colly.LimitRule{DomainGlob: "*", Parallelism: 5})
+	return c
+}
 
 // LinkHandle 替换img/a标签链接
 func LinkHandle(contentDom *goquery.Selection, domain string) {
@@ -52,8 +61,9 @@ A:
 // StrToTime 字符串转时间戳
 func StrToTime(layout, val string) (t time.Time) {
 	var err error
+	loc, err := time.LoadLocation("Asia/Chongqing")
 	if val != "" {
-		t, err = time.Parse(layout, val)
+		t, err = time.ParseInLocation(layout, val, loc)
 		if err != nil {
 			log.Error("时间转换失败：", err.Error())
 		}

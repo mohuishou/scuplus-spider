@@ -41,6 +41,7 @@ func DB() *gorm.DB {
 	if db == nil {
 		initDB()
 	}
+	// db.LogMode(true)
 	return db
 }
 

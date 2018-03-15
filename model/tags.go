@@ -3,7 +3,8 @@ package model
 // Tag 标签
 type Tag struct {
 	Model
-	Name string `gorm:"unique_index"`
+	Name    string   `gorm:"unique_index"`
+	Details []Detail `gorm:"many2many:detail_tags"`
 }
 
 // tagNames 需要初始化捕获的标签

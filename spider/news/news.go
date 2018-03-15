@@ -3,9 +3,10 @@ package news
 import (
 	"fmt"
 	"regexp"
-	"strconv"
 	"strings"
 	"time"
+
+	"github.com/mohuishou/scuplus-spider/config"
 
 	"github.com/mohuishou/scuplus-spider/model"
 	"github.com/mohuishou/scuplus-spider/spider"
@@ -13,95 +14,70 @@ import (
 	"github.com/mohuishou/scuplus-spider/log"
 
 	"github.com/gocolly/colly"
-	"github.com/mohuishou/scuplus-spider/config"
 )
 
 const domain = "http://news.scu.edu.cn"
+const category = "四川大学新闻网"
 
 var urls = map[string]string{
 	"川大在线": "cdzx",
 }
 
-func Spider(conf config.Spider) {
-	if _, ok := urls[conf.Key]; !ok {
-		log.Fatal("[E]: 不存在这个key")
-	}
-
+func Spider(maxTryNum int, key string) {
 	// 入口链接
-	url := fmt.Sprintf("http://news.scu.edu.cn/news2012/%s/I0201index_1.htm", urls[conf.Key])
-
+	url := fmt.Sprintf("http://news.scu.edu.cn/%s.htm", urls[key])
 	tryCount := 0
 
-	c := colly.NewCollector()
-
-	c.DetectCharset = true
-
-	c.Limit(&colly.LimitRule{DomainGlob: "*", Parallelism: 5})
-
+	c := spider.NewCollector()
+	// 获取最后一条数据的时间
+	detail := model.GetLastDetail(category, key)
 	// 获取列表页面的所有列表
-	c.OnHTML("#__01 > tbody > tr:nth-child(9) > td > table > tbody > tr > td > table > tbody > tr:nth-child(1) > td > table > tbody > tr > td > p > table > tbody > tr", func(e *colly.HTMLElement) {
-
-		// 判断是否为最新的页面，如果不是则丢弃
-		if conf.IsNew {
-
-			if tryCount > conf.MaxTryNum {
-				log.Info("已达到最大尝试次数")
-				return
-			}
-
-			// 获取发布时间
-			r, _ := regexp.Compile(`\d{4}-\d{1,2}-\d{1,2}`)
-			createdStr := r.FindString(e.ChildText("td:nth-child(2)"))
-			t, err := time.Parse("2006-01-02", createdStr)
-			if err != nil {
-				log.Info("时间转换失败：", err.Error())
-				return
-			}
-
-			if time.Now().Unix()-t.Unix() > int64(conf.Second) {
-				log.Info("数据已过期，即将被丢弃：", e.Text)
-				tryCount++
-				return
-			}
-		}
-
-		// 发现内容页链接
-		go e.Request.Visit(domain + e.ChildAttr("a", "href"))
-	})
-
-	// 列表页： 获取下一页
-	c.OnHTML("#__01 > tbody > tr:nth-child(9) > td > table > tbody > tr > td > table > tbody > tr:nth-child(2) > td > select > option[selected]", func(e *colly.HTMLElement) {
-
-		// 如果仅需获取最新内容，判断是否已经达到最大尝试次数
-		if tryCount > conf.MaxTryNum {
+	c.OnHTML(".winstyle195338 tr", func(e *colly.HTMLElement) {
+		if tryCount > maxTryNum {
 			log.Info("已达到最大尝试次数")
 			return
 		}
-
-		pageNo, err := strconv.Atoi(e.Text)
+		// 获取发布时间
+		r, _ := regexp.Compile(`\d{4}-\d{1,2}-\d{1,2}`)
+		createdStr := r.FindString(e.ChildText("td:nth-child(3)"))
+		t, err := time.Parse("2006-01-02", createdStr)
 		if err != nil {
-			log.Error("页码获取失败：", err.Error())
+			log.Info("时间转换失败：", err.Error())
 			return
 		}
+		if t.Unix() < detail.CreatedAt.Unix() {
+			tryCount++
+			return
+		}
+		go e.Request.Visit(domain + "/" + strings.Trim(e.ChildAttr("a", "href"), ".."))
+	})
 
-		go e.Request.Visit(fmt.Sprintf("http://news.scu.edu.cn/news2012/%s/I0201index_%d.htm", urls[conf.Key], pageNo+1))
-
+	// 列表页： 获取下一页
+	c.OnHTML(".Next", func(e *colly.HTMLElement) {
+		// 如果仅需获取最新内容，判断是否已经达到最大尝试次数
+		if tryCount > maxTryNum {
+			log.Info("已达到最大尝试次数")
+			return
+		}
+		if strings.Contains(e.Text, "下页") {
+			c.Visit(domain + "/cdzx/" + strings.Trim(e.Attr("href"), "cdzx/"))
+		}
 	})
 
 	// 获取内容页信息
-	c.OnHTML("body", func(e *colly.HTMLElement) {
+	c.OnHTML("form[name=\"_newscontent_fromname\"]", func(e *colly.HTMLElement) {
 		//判断是否是内容页
-		if !strings.Contains(e.Request.URL.Path, "webinfo") {
+		if !strings.Contains(e.Request.URL.Path, "info") {
 			return
 		}
 
 		// 获取发布时间
-		r, _ := regexp.Compile(`\d{4}-\d{1,2}-\d{1,2}\s\d{2}:\d{2}`)
-		createdStr := r.FindString(e.ChildText("#__01 > tbody > tr:nth-child(10) > td > table > tbody > tr > td"))
-		createdAt := spider.StrToTime("2006-01-02 15:04", createdStr)
+		r, _ := regexp.Compile(`\d{4}年\d{1,2}月\d{1,2}日\s\d{2}:\d{2}`)
+		createdStr := r.FindString(e.ChildText("div > div:nth-child(2)"))
+		createdAt := spider.StrToTime("2006年01月02日 15:04", createdStr)
 
 		// content 替换链接 a,img
-		contentDom := e.DOM.Find("#zoom")
+		contentDom := e.DOM.Find("#vsb_content_500")
 		spider.LinkHandle(contentDom, domain)
 
 		// 获取正文
@@ -112,15 +88,15 @@ func Spider(conf config.Spider) {
 		}
 
 		// 获取标题
-		title := e.ChildText("#__01 > tbody > tr:nth-child(9) > td > table > tbody > tr > td > span")
+		title := e.ChildText("div > h3")
 
 		// 获取标签
-		tagIDs := spider.GetTagIDs(title, []string{conf.Key})
+		tagIDs := spider.GetTagIDs(title, []string{category, key})
 
 		detail := &model.Detail{
 			Title:    title,
 			Content:  content,
-			Category: "四川大学新闻网",
+			Category: category,
 			URL:      e.Request.URL.String(),
 			Model:    model.Model{CreatedAt: createdAt},
 		}
@@ -129,8 +105,13 @@ func Spider(conf config.Spider) {
 	})
 
 	c.Visit(url)
-
 	c.Wait()
+}
+
+func Run() {
+	for k := range urls {
+		Spider(config.GetConfig("").MaxTryNum, k)
+	}
 }
 
 // GetURLs 获取所有的url

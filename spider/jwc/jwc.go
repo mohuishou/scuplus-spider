@@ -37,6 +37,7 @@ func Spider(conf config.Spider) {
 
 	// 入口链接
 	url := fmt.Sprintf("http://jwc.scu.edu.cn/jwc/%s.action", urls[conf.Key])
+	log.Info(url)
 
 	tryCount := 0
 
@@ -46,6 +47,7 @@ func Spider(conf config.Spider) {
 
 	// 获取列表页面的所有列表
 	c.OnHTML("#news_list > table > tbody > tr", func(e *colly.HTMLElement) {
+		log.Info(e.Text)
 
 		// 判断是否为最新的页面，如果不是则丢弃
 		if conf.IsNew {
