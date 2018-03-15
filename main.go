@@ -2,6 +2,7 @@ package main
 
 import (
 	"github.com/mohuishou/scuplus-spider/spider/news"
+	"github.com/mohuishou/scuplus-spider/spider/youth"
 	"github.com/robfig/cron"
 )
 
@@ -11,7 +12,8 @@ func main() {
 	c.AddFunc("@every 2h", func() {
 		// 四川大学新闻网
 		news.Run()
-		// 教务处
+		// 青春川大
+		youth.Run()
 	})
 	c.Start()
 	select {}

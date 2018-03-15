@@ -5,16 +5,18 @@ import (
 	"regexp"
 	"time"
 
+	"github.com/mohuishou/scuplus-spider/config"
+
 	"github.com/mohuishou/scuplus-spider/model"
 	"github.com/mohuishou/scuplus-spider/spider"
 
 	"github.com/mohuishou/scuplus-spider/log"
 
 	"github.com/gocolly/colly"
-	"github.com/mohuishou/scuplus-spider/config"
 )
 
 const domain = "http://youth.scu.edu.cn"
+const category = "青春川大"
 
 var urls = map[string]string{
 	"公告":   "notice",
@@ -22,44 +24,31 @@ var urls = map[string]string{
 	"院系风采": "courtyard-style",
 }
 
-func Spider(conf config.Spider) {
-	if _, ok := urls[conf.Key]; !ok {
-		log.Fatal("[E]: 不存在这个key")
-	}
-
-	// 入口链接
-	url := fmt.Sprintf("http://youth.scu.edu.cn/index.php/main/web/%s/p/1", urls[conf.Key])
-
+func Spider(maxTryNum int, key string) {
 	tryCount := 0
 
-	c := colly.NewCollector()
-
-	c.DetectCharset = true
-
-	c.Limit(&colly.LimitRule{DomainGlob: "*", Parallelism: 5})
+	c := spider.NewCollector()
+	// 获取最后一条数据的时间
+	detail := model.GetLastDetail(category, key)
 
 	// 获取列表页面的所有列表
 	c.OnHTML("ul.list-art li", func(e *colly.HTMLElement) {
 
 		// 判断是否为最新的页面，如果不是则丢弃
-		if conf.IsNew {
+		if tryCount > maxTryNum {
+			log.Info("已达到最大尝试次数")
+			return
+		}
 
-			if tryCount > conf.MaxTryNum {
-				log.Info("已达到最大尝试次数")
-				return
-			}
+		t, err := time.Parse("2006-01-02", e.ChildText("span"))
+		if err != nil {
+			log.Info("时间转换失败：", err.Error())
+			return
+		}
 
-			t, err := time.Parse("2006-01-02", e.ChildText("span"))
-			if err != nil {
-				log.Info("时间转换失败：", err.Error())
-				return
-			}
-
-			if time.Now().Unix()-t.Unix() > int64(conf.Second) {
-				log.Info("数据已过期，即将被丢弃：", e.Text)
-				tryCount++
-				return
-			}
+		if t.Unix() < detail.CreatedAt.Unix() {
+			tryCount++
+			return
 		}
 
 		// 发现内容页链接
@@ -70,7 +59,7 @@ func Spider(conf config.Spider) {
 	c.OnHTML(".pagination a.next", func(e *colly.HTMLElement) {
 
 		// 如果仅需获取最新内容，判断是否已经达到最大尝试次数
-		if tryCount > conf.MaxTryNum {
+		if tryCount > maxTryNum {
 			log.Info("已达到最大尝试次数")
 			return
 		}
@@ -101,12 +90,12 @@ func Spider(conf config.Spider) {
 		// 获取标题
 		title := e.ChildText("h1")
 		// 获取标签
-		tagIDs := spider.GetTagIDs(title, []string{conf.Key})
+		tagIDs := spider.GetTagIDs(title, []string{key, category})
 
 		detail := &model.Detail{
 			Title:    title,
 			Content:  content,
-			Category: "青春川大",
+			Category: category,
 			URL:      e.Request.URL.String(),
 			Model:    model.Model{CreatedAt: createdAt},
 		}
@@ -114,9 +103,14 @@ func Spider(conf config.Spider) {
 		detail.Create(tagIDs)
 	})
 
-	c.Visit(url)
-
+	c.Visit(fmt.Sprintf("http://youth.scu.edu.cn/index.php/main/web/%s/p/1", urls[key]))
 	c.Wait()
+}
+
+func Run() {
+	for k := range urls {
+		Spider(config.GetConfig("").MaxTryNum, k)
+	}
 }
 
 // GetURLs 获取所有的url
