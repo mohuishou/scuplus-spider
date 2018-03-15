@@ -1,6 +1,7 @@
 package model
 
 import (
+	"errors"
 	"fmt"
 
 	"github.com/mohuishou/scuplus-spider/log"
@@ -19,6 +20,9 @@ type Detail struct {
 
 // Create 新建一条文章记录
 func (d *Detail) Create(tagIDs []uint) error {
+	if d.Title == "" || d.Content == "" {
+		return errors.New("标题内容不能为空")
+	}
 	tx := DB().Begin()
 	if err := tx.Create(d).Error; err != nil {
 		log.Error(err)
