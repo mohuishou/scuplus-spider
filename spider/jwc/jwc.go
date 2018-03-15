@@ -1,12 +1,16 @@
 package jwc
 
 import (
+	"context"
 	"fmt"
 	"html"
+	"net/http"
 	"regexp"
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/mohuishou/scuplus-spider/config"
 
 	"github.com/mohuishou/scuplus-spider/spider"
 
@@ -17,60 +21,58 @@ import (
 	"github.com/mohuishou/scuplus-spider/log"
 
 	"github.com/gocolly/colly"
-	"github.com/mohuishou/scuplus-spider/config"
+
+	"github.com/chromedp/chromedp/client"
+
+	"github.com/chromedp/cdproto/network"
+
+	"github.com/chromedp/cdproto/cdp"
+
+	"github.com/chromedp/chromedp"
 )
 
 const domain = "http://jwc.scu.edu.cn/jwc/"
-
-// 最大页码，由于全量数据一般只执行一次，所以直接写死
-const maxPage = 226
+const category = "教务处"
 
 var urls = map[string]string{
 	"公告": "moreNotice",
 	"新闻": "moreNews",
 }
 
-func Spider(conf config.Spider) {
-	if _, ok := urls[conf.Key]; !ok {
-		log.Fatal("不存在这个key", conf)
-	}
-
-	// 入口链接
-	url := fmt.Sprintf("http://jwc.scu.edu.cn/jwc/%s.action", urls[conf.Key])
-	log.Info(url)
-
+func Spider(maxTryNum int, key string) {
 	tryCount := 0
-
-	c := colly.NewCollector()
-
-	c.Limit(&colly.LimitRule{DomainGlob: "*", Parallelism: 5})
-
+	c := spider.NewCollector()
+	cookies, err := GetCookies()
+	if err != nil {
+		log.Warn("cookie获取错误", err)
+		return
+	}
+	err = c.SetCookies(domain, cookies)
+	if err != nil {
+		log.Warn("cookie设置错误", err)
+		return
+	}
+	// 获取最后一条数据的时间
+	detail := model.GetLastDetail(category, key)
 	// 获取列表页面的所有列表
 	c.OnHTML("#news_list > table > tbody > tr", func(e *colly.HTMLElement) {
-		log.Info(e.Text)
+		if tryCount > maxTryNum {
+			log.Info("已达到最大尝试次数")
+			return
+		}
 
-		// 判断是否为最新的页面，如果不是则丢弃
-		if conf.IsNew {
+		// 获取发布时间
+		r, _ := regexp.Compile(`\d{4}\.\d{1,2}\.\d{1,2}`)
+		createdStr := r.FindString(e.ChildText("td:nth-child(2)"))
+		t, err := time.Parse("2006.01.02", createdStr)
+		if err != nil {
+			log.Info("时间转换失败：", err.Error())
+			return
+		}
 
-			if tryCount > conf.MaxTryNum {
-				log.Info("已达到最大尝试次数")
-				return
-			}
-
-			// 获取发布时间
-			r, _ := regexp.Compile(`\d{4}\.\d{1,2}\.\d{1,2}`)
-			createdStr := r.FindString(e.ChildText("td:nth-child(2)"))
-			t, err := time.Parse("2006.01.02", createdStr)
-			if err != nil {
-				log.Info("时间转换失败：", err.Error())
-				return
-			}
-
-			if time.Now().Unix()-t.Unix() > int64(conf.Second) {
-				log.Info("数据已过期，即将被丢弃：", e.ChildText("a"))
-				tryCount++
-				return
-			}
+		if t.Unix() < detail.CreatedAt.Unix() {
+			tryCount++
+			return
 		}
 
 		// 发现内容页链接
@@ -81,7 +83,7 @@ func Spider(conf config.Spider) {
 	c.OnHTML("#pagenext", func(e *colly.HTMLElement) {
 
 		// 如果仅需获取最新内容，判断是否已经达到最大尝试次数
-		if tryCount > conf.MaxTryNum {
+		if tryCount > maxTryNum {
 			log.Info("已达到最大尝试次数")
 			return
 		}
@@ -93,10 +95,7 @@ func Spider(conf config.Spider) {
 		}
 
 		// 发现下一列表页
-		if pageNow < maxPage {
-			go e.Request.Visit(fmt.Sprintf("%s%s.action?url=%s.action&type=2&keyWord=&pager.pageNow=%d", domain, urls[conf.Key], urls[conf.Key], pageNow+1))
-		}
-
+		go e.Request.Visit(fmt.Sprintf("%s%s.action?url=%s.action&type=2&keyWord=&pager.pageNow=%d", domain, urls[key], urls[key], pageNow+1))
 	})
 
 	// 获取内容页信息
@@ -130,22 +129,69 @@ func Spider(conf config.Spider) {
 		title := e.ChildText("table:nth-child(3) > tbody > tr:nth-child(2) > td > b")
 
 		// 获取标签
-		tagIDs := spider.GetTagIDs(title, []string{conf.Key})
+		tagIDs := spider.GetTagIDs(title, []string{category, key})
 
 		detail := &model.Detail{
 			Title:    title,
 			Content:  content,
-			Category: "教务处",
+			Category: category,
 			URL:      e.Request.URL.String(),
 			Model:    model.Model{CreatedAt: createdAt},
 		}
-
 		detail.Create(tagIDs)
 	})
 
-	c.Visit(url)
-
+	c.Visit(fmt.Sprintf("http://jwc.scu.edu.cn/jwc/%s.action", urls[key]))
 	c.Wait()
+}
+
+func Run() {
+	for k := range urls {
+		Spider(config.GetConfig("").MaxTryNum, k)
+	}
+}
+
+// GetCookies 获取cookie字符串
+func GetCookies() ([]*http.Cookie, error) {
+	var err error
+
+	// create context
+	ctxt, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	// create chrome instance
+	c, err := chromedp.New(ctxt, chromedp.WithTargets(client.New().WatchPageTargets(ctxt)))
+	if err != nil {
+		log.Warn(err)
+		return nil, err
+	}
+	cookies := []*http.Cookie{}
+
+	// run task list
+	err = c.Run(ctxt, chromedp.Tasks{
+		chromedp.Navigate(`http://jwc.scu.edu.cn/jwc/moreNotice.action`),
+		chromedp.WaitVisible(`table`, chromedp.ByQuery),
+		chromedp.ActionFunc(func(ctx context.Context, h cdp.Executor) error {
+			allCookies, err := network.GetAllCookies().Do(ctx, h)
+			for _, v := range allCookies {
+				cookies = append(cookies, &http.Cookie{
+					Name:   v.Name,
+					Value:  v.Value,
+					Domain: v.Domain,
+					Path:   v.Path,
+				})
+			}
+			if err != nil {
+				return err
+			}
+			return nil
+		}),
+	})
+	if err != nil {
+		log.Warn(err)
+		return nil, err
+	}
+	return cookies, nil
 }
 
 // GetURLs 获取所有的url
