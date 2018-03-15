@@ -115,8 +115,3 @@ func Run() {
 		Spider(config.GetConfig("").MaxTryNum, k)
 	}
 }
-
-// GetURLs 获取所有的url
-func GetURLs() map[string]string {
-	return urls
-}
