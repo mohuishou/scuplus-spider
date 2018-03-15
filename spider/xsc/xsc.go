@@ -97,7 +97,7 @@ func Spider(maxTryNum int, key string) {
 		detail := &model.Detail{
 			Title:    title,
 			Content:  content,
-			Category: "学工部",
+			Category: category,
 			URL:      e.Request.URL.String(),
 			Model:    model.Model{CreatedAt: createdAt},
 		}
