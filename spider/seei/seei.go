@@ -1,7 +1,6 @@
 package eie
 
 import (
-	"fmt"
 	"regexp"
 	"strings"
 	"time"
@@ -16,19 +15,19 @@ import (
 	"github.com/gocolly/colly"
 )
 
-const domain = "http://eie.scu.edu.cn"
-const category = "电子信息学院"
+const domain = "http://seei.scu.edu.cn"
+const category = "电气信息学院"
 
 var urls = map[string]string{
-	"新闻":    "1",
-	"公告":    "2",
-	"本科教育":  "9",
-	"研究生教育": "10",
+	"新闻":    "/AllNewsList.aspx?tid=1",
+	"公告":    "/AllNewsList.aspx?tid=2",
+	"科研动态":  "/NewsList.aspx?tid=7",
+	"本科教育":  "/NewsList.aspx?tid=9",
+	"研究生教育": "/NewsList.aspx?tid=10",
 }
 
 func Spider(maxTryNum int, key string) {
 	// 入口链接
-	url := fmt.Sprintf("%s/NewsList.aspx?tid=%s", domain, urls[key])
 	tryCount := 0
 
 	c := spider.NewCollector()
@@ -62,7 +61,7 @@ func Spider(maxTryNum int, key string) {
 			log.Info("已达到最大尝试次数")
 			return
 		}
-		c.Visit(domain + "/NewsList.aspx" + e.Attr("href"))
+		c.Visit(domain + strings.Split(urls[key], "?")[0] + e.Attr("href"))
 	})
 
 	// 获取内容页信息
@@ -105,7 +104,7 @@ func Spider(maxTryNum int, key string) {
 		detail.Create(tagIDs)
 	})
 
-	c.Visit(url)
+	c.Visit(domain + urls[key])
 	c.Wait()
 }
 
