@@ -1,4 +1,4 @@
-package seei
+package clinical
 
 import "testing"
 

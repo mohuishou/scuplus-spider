@@ -1,4 +1,4 @@
-package seei
+package clinical
 
 import (
 	"regexp"
@@ -15,33 +15,31 @@ import (
 	"github.com/gocolly/colly"
 )
 
-const domain = "http://seei.scu.edu.cn"
-const category = "电气信息学院"
+const domain = "http://www.cd120.com"
+const category = "华西临床医学院"
 
 var urls = map[string]string{
-	"新闻":    "/AllNewsList.aspx?tid=1",
-	"公告":    "/AllNewsList.aspx?tid=2",
-	"科研动态":  "/NewsList.aspx?tid=7",
-	"本科教育":  "/NewsList.aspx?tid=9",
-	"研究生教育": "/NewsList.aspx?tid=10",
+	"新闻":   "/htmlnewszhongyaoxinwen/index.jhtml",
+	"院内动态": "/htmlnewsdongtaixinwen/index.jhtml",
+	"公告":   "/htmlnewsgonggaolan/index.jhtml",
+	"院内通知": "/htmlnewsyuannatongzhi/index.jhtml",
+	"会议通知": "/htmlnewshuiyizhuanlan/index.jhtml",
 }
 
 func Spider(maxTryNum int, key string) {
 	// 入口链接
 	tryCount := 0
-
 	c := spider.NewCollector()
 	// 获取最后一条数据的时间
 	detail := model.GetLastDetail(category, key)
 	// 获取列表页面的所有列表
-	c.OnHTML(".onetitle", func(e *colly.HTMLElement) {
+	c.OnHTML(".infoContent > ul:nth-child(1) > li", func(e *colly.HTMLElement) {
 		if tryCount > maxTryNum {
 			log.Info("已达到最大尝试次数")
 			return
 		}
 		// 获取发布时间
-		r, _ := regexp.Compile(`\d{4}-\d{1,2}-\d{1,2}`)
-		createdStr := r.FindString(e.ChildText("span"))
+		createdStr := e.ChildText("p:nth-child(2)")
 		t, err := time.Parse("2006-01-02", createdStr)
 		if err != nil {
 			log.Info("时间转换失败：", err.Error())
@@ -51,34 +49,33 @@ func Spider(maxTryNum int, key string) {
 			tryCount++
 			return
 		}
-		go e.Request.Visit(domain + "/" + strings.Trim(e.ChildAttr("a", "href"), ".."))
+		go e.Request.Visit(domain + e.ChildAttr("a", "href"))
 	})
 
 	// 列表页： 获取下一页
-	c.OnHTML(".yahoo a:last-child", func(e *colly.HTMLElement) {
+	c.OnHTML(".pages > div:nth-child(1) > a:nth-child(3)", func(e *colly.HTMLElement) {
 		// 如果仅需获取最新内容，判断是否已经达到最大尝试次数
 		if tryCount > maxTryNum {
 			log.Info("已达到最大尝试次数")
 			return
 		}
-		c.Visit(domain + strings.Split(urls[key], "?")[0] + e.Attr("href"))
+		c.Visit(domain + strings.Trim(urls[key], "index.jhtml") + e.Attr("href"))
 	})
 
 	// 获取内容页信息
-	c.OnHTML(".contentlist", func(e *colly.HTMLElement) {
+	c.OnHTML(".w756", func(e *colly.HTMLElement) {
 		//判断是否是内容页
-		if strings.Contains(e.Request.URL.Path, "tid") {
+		if e.ChildText("h5") == "" {
 			return
 		}
 
 		// 获取发布时间
 		r, _ := regexp.Compile(`\d{4}-\d{1,2}-\d{1,2}`)
-		createdStr := r.FindString(e.ChildText("newsinfo"))
+		createdStr := r.FindString(e.ChildText("div.author:nth-child(2)"))
 		createdAt := spider.StrToTime("2006-01-02", createdStr)
 
 		// content 替换链接 a,img
-		contentDom := e.DOM.Find(".newsdesc")
-		spider.LinkHandle(contentDom, domain+"/")
+		contentDom := e.DOM.Find(".newsContent")
 
 		// 获取正文
 		content, err := contentDom.Html()
@@ -88,7 +85,7 @@ func Spider(maxTryNum int, key string) {
 		}
 
 		// 获取标题
-		title := e.ChildText(".newstitle")
+		title := e.ChildText("h5:nth-child(1)")
 
 		// 获取标签
 		tagIDs := spider.GetTagIDs(title, []string{category, key})
