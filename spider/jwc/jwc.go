@@ -165,7 +165,7 @@ func GetCookies() ([]*http.Cookie, error) {
 		log.Warn(err)
 		return nil, err
 	}
-	cookies := []*http.Cookie{}
+	var cookies []*http.Cookie
 
 	// run task list
 	err = c.Run(ctxt, chromedp.Tasks{
@@ -192,9 +192,4 @@ func GetCookies() ([]*http.Cookie, error) {
 		return nil, err
 	}
 	return cookies, nil
-}
-
-// GetURLs 获取所有的url
-func GetURLs() map[string]string {
-	return urls
 }
