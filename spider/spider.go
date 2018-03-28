@@ -1,15 +1,26 @@
 package spider
 
 import (
+	"context"
+	"net/http"
 	"strings"
 	"time"
 
-	"github.com/gocolly/colly"
-	"github.com/mohuishou/scuplus-spider/log"
+	"github.com/PuerkitoBio/goquery"
 
 	"github.com/mohuishou/scuplus-spider/model"
 
-	"github.com/PuerkitoBio/goquery"
+	"github.com/mohuishou/scuplus-spider/log"
+
+	"github.com/gocolly/colly"
+
+	"github.com/chromedp/chromedp/client"
+
+	"github.com/chromedp/cdproto/network"
+
+	"github.com/chromedp/cdproto/cdp"
+
+	"github.com/chromedp/chromedp"
 )
 
 // NewCollector 新建一个Collector
@@ -17,6 +28,24 @@ func NewCollector() *colly.Collector {
 	c := colly.NewCollector()
 	c.DetectCharset = true
 	c.Limit(&colly.LimitRule{DomainGlob: "*", Parallelism: 5})
+	return c
+}
+
+// NewCollectorWithCookie 新建一个通过认证的Collector
+func NewCollectorWithCookie(domain, tag string) *colly.Collector {
+	c := colly.NewCollector()
+	c.DetectCharset = true
+	c.Limit(&colly.LimitRule{DomainGlob: "*", Parallelism: 5})
+	cookies, err := GetCookies("http://"+domain, tag)
+	if err != nil {
+		log.Warn("cookie获取错误", err)
+		return nil
+	}
+	err = c.SetCookies(domain, cookies)
+	if err != nil {
+		log.Warn("cookie设置错误", err)
+		return nil
+	}
 	return c
 }
 
@@ -69,4 +98,46 @@ func StrToTime(layout, val string) (t time.Time) {
 		}
 	}
 	return t
+}
+
+// GetCookies 获取cookie字符串
+func GetCookies(url, tag string) ([]*http.Cookie, error) {
+	var err error
+	// create context
+	ctxt, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	// create chrome instance
+	c, err := chromedp.New(ctxt, chromedp.WithTargets(client.New().WatchPageTargets(ctxt)))
+	if err != nil {
+		log.Warn(err)
+		return nil, err
+	}
+	var cookies []*http.Cookie
+
+	// run task list
+	err = c.Run(ctxt, chromedp.Tasks{
+		chromedp.Navigate(url),
+		chromedp.WaitVisible(tag, chromedp.ByQuery),
+		chromedp.ActionFunc(func(ctx context.Context, h cdp.Executor) error {
+			allCookies, err := network.GetAllCookies().Do(ctx, h)
+			for _, v := range allCookies {
+				cookies = append(cookies, &http.Cookie{
+					Name:   v.Name,
+					Value:  v.Value,
+					Domain: v.Domain,
+					Path:   v.Path,
+				})
+			}
+			if err != nil {
+				return err
+			}
+			return nil
+		}),
+	})
+	if err != nil {
+		log.Warn(err)
+		return nil, err
+	}
+	return cookies, nil
 }

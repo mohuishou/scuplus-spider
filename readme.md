@@ -18,6 +18,8 @@
 - [x] [教务处](spider/jwc)
 - [x] [学工部](spider/xsc)
 - [x] [四川大学新闻网](spider/news)
+- [x] [研究生院](spider/gs)
+- [x] [就业网](spider/jy)
 
 ### 学院官网
 
