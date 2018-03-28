@@ -52,12 +52,12 @@ func NewCollectorWithCookie(domain, tag string) *colly.Collector {
 // LinkHandle 替换img/a标签链接
 func LinkHandle(contentDom *goquery.Selection, domain string) {
 	contentDom.Find("img").Each(func(i int, s *goquery.Selection) {
-		if src, exist := s.Attr("src"); exist {
+		if src, exist := s.Attr("src"); exist && !strings.Contains(src, "http") && !strings.Contains(src, "base64") {
 			s.SetAttr("src", domain+src)
 		}
 	})
 	contentDom.Find("a").Each(func(i int, s *goquery.Selection) {
-		if href, exist := s.Attr("href"); exist {
+		if href, exist := s.Attr("href"); exist && !strings.Contains(href, "http") {
 			s.SetAttr("href", domain+href)
 		}
 	})

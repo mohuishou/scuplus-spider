@@ -122,7 +122,7 @@ func Spider(maxTryNum int, key string) {
 		}
 
 		// 获取标题
-		title := e.ChildText("#ContentPlaceHolder1_title > span")
+		title := e.ChildText("#ContentPlaceHolder1_title")
 
 		// 获取标签
 		tagIDs := spider.GetTagIDs(title, []string{category, key})
