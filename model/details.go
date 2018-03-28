@@ -12,7 +12,7 @@ type Detail struct {
 	Model
 	Author   string
 	Title    string `gorm:"index"`
-	Content  string `gorm:"type:text;"`
+	Content  string `gorm:"type:longtext;"`
 	URL      string
 	Category string
 	Tags     []Tag `gorm:"many2many:detail_tags"`
