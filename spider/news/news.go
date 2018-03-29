@@ -77,7 +77,7 @@ func Spider(maxTryNum int, key string) {
 		createdAt := spider.StrToTime("2006年01月02日 15:04", createdStr)
 
 		// content 替换链接 a,img
-		contentDom := e.DOM.Find("#vsb_content_500")
+		contentDom := e.DOM.Find("div > div:nth-child(3)")
 		spider.LinkHandle(contentDom, domain)
 
 		// 获取正文

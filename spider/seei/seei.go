@@ -73,7 +73,7 @@ func Spider(maxTryNum int, key string) {
 
 		// 获取发布时间
 		r, _ := regexp.Compile(`\d{4}-\d{1,2}-\d{1,2}`)
-		createdStr := r.FindString(e.ChildText("newsinfo"))
+		createdStr := r.FindString(e.ChildText(".newsinfo"))
 		createdAt := spider.StrToTime("2006-01-02", createdStr)
 
 		// content 替换链接 a,img
