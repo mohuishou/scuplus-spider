@@ -32,7 +32,7 @@ var urls = map[string]string{
 func Spider(maxTryNum int, key string) {
 	tryCount := 0
 	c := spider.NewCollector()
-	cookies, err := spider.GetCookies(domain+urls[key], "table")
+	cookies, err := spider.GetCookies(fmt.Sprintf("http://jwc.scu.edu.cn/jwc/%s.action", urls[key]), "table")
 	if err != nil {
 		log.Warn("cookie获取错误", err)
 		return
