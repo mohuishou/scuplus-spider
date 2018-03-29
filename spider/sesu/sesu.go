@@ -1,10 +1,8 @@
 package sesu
 
 import (
-	"context"
 	"fmt"
 	"html"
-	"net/http"
 	"regexp"
 	"strings"
 	"time"
@@ -20,14 +18,6 @@ import (
 	"github.com/mohuishou/scuplus-spider/log"
 
 	"github.com/gocolly/colly"
-
-	"github.com/chromedp/chromedp/client"
-
-	"github.com/chromedp/cdproto/network"
-
-	"github.com/chromedp/cdproto/cdp"
-
-	"github.com/chromedp/chromedp"
 )
 
 const domain = "http://sesu.scu.edu.cn"
@@ -43,7 +33,7 @@ var urls = map[string]string{
 func Spider(maxTryNum int, key string) {
 	tryCount := 0
 	c := spider.NewCollector()
-	cookies, err := GetCookies()
+	cookies, err := spider.GetCookies(domain, ".content")
 	if err != nil {
 		log.Warn("cookie获取错误", err)
 		return
@@ -146,52 +136,4 @@ func Run() {
 	for k := range urls {
 		Spider(config.GetConfig("").MaxTryNum, k)
 	}
-}
-
-// GetCookies 获取cookie字符串
-func GetCookies() ([]*http.Cookie, error) {
-	var err error
-
-	// create context
-	ctxt, cancel := context.WithCancel(context.Background())
-	defer cancel()
-
-	// create chrome instance
-	c, err := chromedp.New(ctxt, chromedp.WithTargets(client.New().WatchPageTargets(ctxt)))
-	if err != nil {
-		log.Warn(err)
-		return nil, err
-	}
-	cookies := []*http.Cookie{}
-
-	// run task list
-	err = c.Run(ctxt, chromedp.Tasks{
-		chromedp.Navigate(domain),
-		chromedp.WaitVisible(`.content`, chromedp.ByQuery),
-		chromedp.ActionFunc(func(ctx context.Context, h cdp.Executor) error {
-			allCookies, err := network.GetAllCookies().Do(ctx, h)
-			for _, v := range allCookies {
-				cookies = append(cookies, &http.Cookie{
-					Name:   v.Name,
-					Value:  v.Value,
-					Domain: v.Domain,
-					Path:   v.Path,
-				})
-			}
-			if err != nil {
-				return err
-			}
-			return nil
-		}),
-	})
-	if err != nil {
-		log.Warn(err)
-		return nil, err
-	}
-	return cookies, nil
-}
-
-// GetURLs 获取所有的url
-func GetURLs() map[string]string {
-	return urls
 }

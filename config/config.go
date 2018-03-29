@@ -27,9 +27,10 @@ type Mysql struct {
 
 // Config 对应config.yml文件的位置
 type Config struct {
-	Mysql  `toml:"mysql"`
-	Spider `toml:"spider"`
-	Spec   string `toml:"spec"`
+	Mysql     `toml:"mysql"`
+	Spider    `toml:"spider"`
+	Spec      string `toml:"spec"`
+	ChromeURL string `toml:"chrome_url"`
 }
 
 var config Config

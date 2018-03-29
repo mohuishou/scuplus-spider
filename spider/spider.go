@@ -6,6 +6,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/mohuishou/scuplus-spider/config"
+
 	"github.com/PuerkitoBio/goquery"
 
 	"github.com/mohuishou/scuplus-spider/model"
@@ -106,9 +108,11 @@ func GetCookies(url, tag string) ([]*http.Cookie, error) {
 	// create context
 	ctxt, cancel := context.WithCancel(context.Background())
 	defer cancel()
-
+	chromeClient := client.New()
+	chromeURL := client.URL(config.GetConfig("").ChromeURL)
+	chromeURL(chromeClient)
 	// create chrome instance
-	c, err := chromedp.New(ctxt, chromedp.WithTargets(client.New().WatchPageTargets(ctxt)))
+	c, err := chromedp.New(ctxt, chromedp.WithTargets(chromeClient.WatchPageTargets(ctxt)))
 	if err != nil {
 		log.Warn(err)
 		return nil, err
