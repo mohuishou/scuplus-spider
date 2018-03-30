@@ -2,7 +2,6 @@ package sesu
 
 import (
 	"fmt"
-	"html"
 	"regexp"
 	"strings"
 	"time"
@@ -10,8 +9,6 @@ import (
 	"github.com/mohuishou/scuplus-spider/config"
 
 	"github.com/mohuishou/scuplus-spider/spider"
-
-	"github.com/PuerkitoBio/goquery"
 
 	"github.com/mohuishou/scuplus-spider/model"
 
@@ -33,7 +30,7 @@ var urls = map[string]string{
 func Spider(maxTryNum int, key string) {
 	tryCount := 0
 	c := spider.NewCollector()
-	cookies, err := spider.GetCookies(domain, ".content")
+	cookies, err := spider.GetCookies(domain, "div")
 	if err != nil {
 		log.Warn("cookie获取错误", err)
 		return
@@ -98,15 +95,9 @@ func Spider(maxTryNum int, key string) {
 		createdAt := spider.StrToTime("2006-01-02 15:04", createdStr)
 
 		// 获取正文
-		content := e.ChildAttr(".mt20 > table:nth-child(1) > tbody:nth-child(1) > tr:nth-child(1) > td:nth-child(1)", "value")
-		content = html.UnescapeString(content)
-		doc, err := goquery.NewDocumentFromReader(strings.NewReader(content))
-		if err != nil {
-			log.Error("正文获取错误：", err)
-			return
-		}
-		spider.LinkHandle(doc.Selection, domain)
-		content, err = doc.Html()
+		contentDom := e.DOM.Find(".mt20 > table:nth-child(1) > tbody:nth-child(1) > tr:nth-child(1) > td:nth-child(1)")
+		spider.LinkHandle(contentDom, domain)
+		content, err := contentDom.Html()
 		if err != nil {
 			log.Error("正文获取错误：", err)
 			return
