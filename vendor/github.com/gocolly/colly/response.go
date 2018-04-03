@@ -1,3 +1,17 @@
+// Copyright 2018 Adam Tauber
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//      http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 package colly
 
 import (
@@ -41,32 +55,45 @@ func (r *Response) FileName() string {
 	if r.Request.URL.RawQuery != "" {
 		return SanitizeFileName(fmt.Sprintf("%s_%s", r.Request.URL.Path, r.Request.URL.RawQuery))
 	}
-	return SanitizeFileName(r.Request.URL.Path[1:])
+	return SanitizeFileName(strings.TrimPrefix(r.Request.URL.Path, "/"))
 }
 
-func (r *Response) fixCharset(detectCharset bool) {
+func (r *Response) fixCharset(detectCharset bool, defaultEncoding string) error {
+	if defaultEncoding != "" {
+		tmpBody, err := encodeBytes(r.Body, "text/plain; charset="+defaultEncoding)
+		if err != nil {
+			return err
+		}
+		r.Body = tmpBody
+		return nil
+	}
 	contentType := strings.ToLower(r.Headers.Get("Content-Type"))
 	if !strings.Contains(contentType, "charset") {
 		if !detectCharset {
-			return
+			return nil
 		}
 		d := chardet.NewTextDetector()
 		r, err := d.DetectBest(r.Body)
 		if err != nil {
-			return
+			return err
 		}
-		contentType = r.Charset
+		contentType = "text/plain; charset=" + r.Charset
 	}
 	if strings.Contains(contentType, "utf-8") || strings.Contains(contentType, "utf8") {
-		return
+		return nil
 	}
-	encodedBodyReader, err := charset.NewReader(bytes.NewReader(r.Body), contentType)
+	tmpBody, err := encodeBytes(r.Body, contentType)
 	if err != nil {
-		return
-	}
-	tmpBody, err := ioutil.ReadAll(encodedBodyReader)
-	if err != nil {
-		return
+		return err
 	}
 	r.Body = tmpBody
+	return nil
+}
+
+func encodeBytes(b []byte, contentType string) ([]byte, error) {
+	r, err := charset.NewReader(bytes.NewReader(b), contentType)
+	if err != nil {
+		return nil, err
+	}
+	return ioutil.ReadAll(r)
 }

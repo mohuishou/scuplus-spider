@@ -11,13 +11,31 @@
   branch = "master"
   name = "github.com/PuerkitoBio/goquery"
   packages = ["."]
-  revision = "bc4e06eb0792d1a14661d19dd7822163c25bb6bd"
+  revision = "ea1bc64a63088ac2bbf1a2edcae38413794a7710"
+
+[[projects]]
+  name = "github.com/andybalholm/cascadia"
+  packages = ["."]
+  revision = "901648c87902174f774fac311d7f176f8647bdaa"
+  version = "v1.0.0"
 
 [[projects]]
   branch = "master"
-  name = "github.com/andybalholm/cascadia"
+  name = "github.com/antchfx/htmlquery"
   packages = ["."]
-  revision = "349dd0209470eabd9514242c688c403c0926d266"
+  revision = "9f7717ac9bac5f660391c57e3d496b3c7cf9741f"
+
+[[projects]]
+  branch = "master"
+  name = "github.com/antchfx/xmlquery"
+  packages = ["."]
+  revision = "f3845cf372319e5428e4c6704089452ddff8ef8b"
+
+[[projects]]
+  branch = "master"
+  name = "github.com/antchfx/xpath"
+  packages = ["."]
+  revision = "da6624a57bffc012f598c42f781bd5919fbfadb2"
 
 [[projects]]
   branch = "master"
@@ -89,7 +107,6 @@
   version = "v1.3"
 
 [[projects]]
-  branch = "master"
   name = "github.com/gobwas/glob"
   packages = [
     ".",
@@ -101,22 +118,24 @@
     "util/runes",
     "util/strings"
   ]
-  revision = "51eb1ee00b6d931c66d229ceeb7c31b985563420"
+  revision = "5ccd90ef52e1e632236f7326478d4faa74f99438"
+  version = "v0.2.3"
 
 [[projects]]
   branch = "master"
   name = "github.com/gocolly/colly"
   packages = [
     ".",
-    "debug"
+    "debug",
+    "storage"
   ]
-  revision = "4d152951427ea081cfa00169114bcb98600e70bd"
+  revision = "bac90d5d33f88d9153d8b0e83a5cc8b05a3f9f8d"
 
 [[projects]]
-  branch = "master"
   name = "github.com/golang/protobuf"
   packages = ["proto"]
-  revision = "1e59b77b52bf8e4b449a57e6f79f21226d571845"
+  revision = "925541529c1fa6821df4e44ce2723319eb2be768"
+  version = "v1.0.0"
 
 [[projects]]
   name = "github.com/gorilla/websocket"
@@ -131,13 +150,13 @@
     ".",
     "dialects/mysql"
   ]
-  revision = "0a51f6cdc55d1650d9ed3b4c13026cfa9133b01e"
+  revision = "52c5c8127cf4aeffde3e0aa9222640832075a90f"
 
 [[projects]]
   branch = "master"
   name = "github.com/jinzhu/inflection"
   packages = ["."]
-  revision = "1c35d901db3da928c72a72d8458480cc9ade058f"
+  revision = "04140366298a54a039076d798123ffa108fff46c"
 
 [[projects]]
   name = "github.com/kennygrant/sanitize"
@@ -205,10 +224,9 @@
     "html/atom",
     "html/charset"
   ]
-  revision = "d866cfc389cec985d6fda2859936a575a55a3ab6"
+  revision = "b68f30494add4df6bd8ef5e82803f308e7f7c59c"
 
 [[projects]]
-  branch = "master"
   name = "golang.org/x/text"
   packages = [
     "encoding",
@@ -229,10 +247,10 @@
     "transform",
     "unicode/cldr"
   ]
-  revision = "e19ae1496984b1c655b8044a65c0300a3c878dd3"
+  revision = "f21a4dfb5e38f5895301dc265a8def02365cc3d0"
+  version = "v0.3.0"
 
 [[projects]]
-  branch = "master"
   name = "google.golang.org/appengine"
   packages = [
     ".",
@@ -246,7 +264,8 @@
     "internal/urlfetch",
     "urlfetch"
   ]
-  revision = "5bee14b453b4c71be47ec1781b0fa61c2ea182db"
+  revision = "150dc57a1b433e64154302bdc40b6bb8aefa313a"
+  version = "v1.0.0"
 
 [solve-meta]
   analyzer-name = "dep"

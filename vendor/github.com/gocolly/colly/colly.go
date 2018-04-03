@@ -1,3 +1,17 @@
+// Copyright 2018 Adam Tauber
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//      http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 // Package colly implements a HTTP scraping framework
 package colly
 
@@ -8,24 +22,32 @@ import (
 	"fmt"
 	"hash/fnv"
 	"io"
+	"io/ioutil"
+	"log"
 	"net/http"
 	"net/http/cookiejar"
 	"net/url"
+	"os"
 	"path/filepath"
 	"regexp"
+	"strconv"
 	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
 
-	"github.com/gocolly/colly/debug"
-
+	"golang.org/x/net/html"
 	"google.golang.org/appengine"
 	"google.golang.org/appengine/urlfetch"
 
 	"github.com/PuerkitoBio/goquery"
+	"github.com/antchfx/htmlquery"
+	"github.com/antchfx/xmlquery"
 	"github.com/kennygrant/sanitize"
 	"github.com/temoto/robotstxt"
+
+	"github.com/gocolly/colly/debug"
+	"github.com/gocolly/colly/storage"
 )
 
 // Collector provides the scraper instance for a scraping job
@@ -58,15 +80,25 @@ type Collector struct {
 	// the target host's robots.txt file.  See http://www.robotstxt.org/ for more
 	// information.
 	IgnoreRobotsTxt bool
-	// Id is the unique identifier of a collector
-	Id uint32
+	// Async turns on asynchronous network communication. Use Collector.Wait() to
+	// be sure all requests have been finished.
+	Async bool
+	// ParseHTTPErrorResponse allows parsing HTTP responses with non 2xx status codes.
+	// By default, Colly parses only successful HTTP responses. Set ParseHTTPErrorResponse
+	// to true to enable it.
+	ParseHTTPErrorResponse bool
+	// ID is the unique identifier of a collector
+	ID uint32
 	// DetectCharset can enable character encoding detection for non-utf8 response bodies
 	// without explicit charset declaration. This feature uses https://github.com/saintfish/chardet
-	DetectCharset     bool
+	DetectCharset bool
+	// RedirectHandler allows control on how a redirect will be managed
+	RedirectHandler   func(req *http.Request, via []*http.Request) error
+	store             storage.Storage
 	debugger          debug.Debugger
-	visitedURLs       map[uint64]bool
 	robotsMap         map[string]*robotstxt.RobotsData
 	htmlCallbacks     []*htmlCallbackContainer
+	xmlCallbacks      []*xmlCallbackContainer
 	requestCallbacks  []RequestCallback
 	responseCallbacks []ResponseCallback
 	errorCallbacks    []ErrorCallback
@@ -87,6 +119,9 @@ type ResponseCallback func(*Response)
 // HTMLCallback is a type alias for OnHTML callback functions
 type HTMLCallback func(*HTMLElement)
 
+// XMLCallback is a type alias for OnXML callback functions
+type XMLCallback func(*XMLElement)
+
 // ErrorCallback is a type alias for OnError callback functions
 type ErrorCallback func(*Response, error)
 
@@ -99,6 +134,16 @@ type ProxyFunc func(*http.Request) (*url.URL, error)
 type htmlCallbackContainer struct {
 	Selector string
 	Function HTMLCallback
+}
+
+type xmlCallbackContainer struct {
+	Query    string
+	Function XMLCallback
+}
+
+type cookieJarSerializer struct {
+	store storage.Storage
+	lock  *sync.RWMutex
 }
 
 var collectorCounter uint32
@@ -124,11 +169,166 @@ var (
 	ErrNoPattern = errors.New("No pattern defined in LimitRule")
 )
 
+var envMap = map[string]func(*Collector, string){
+	"ALLOWED_DOMAINS": func(c *Collector, val string) {
+		c.AllowedDomains = strings.Split(val, ",")
+	},
+	"CACHE_DIR": func(c *Collector, val string) {
+		c.CacheDir = val
+	},
+	"DETECT_CHARSET": func(c *Collector, val string) {
+		c.DetectCharset = isYesString(val)
+	},
+	"DISABLE_COOKIES": func(c *Collector, _ string) {
+		c.backend.Client.Jar = nil
+	},
+	"DISALLOWED_DOMAINS": func(c *Collector, val string) {
+		c.DisallowedDomains = strings.Split(val, ",")
+	},
+	"IGNORE_ROBOTSTXT": func(c *Collector, val string) {
+		c.IgnoreRobotsTxt = isYesString(val)
+	},
+	"FOLLOW_REDIRECTS": func(c *Collector, val string) {
+		if !isYesString(val) {
+			c.RedirectHandler = func(req *http.Request, via []*http.Request) error {
+				return http.ErrUseLastResponse
+			}
+		}
+	},
+	"MAX_BODY_SIZE": func(c *Collector, val string) {
+		size, err := strconv.Atoi(val)
+		if err == nil {
+			c.MaxBodySize = size
+		}
+	},
+	"MAX_DEPTH": func(c *Collector, val string) {
+		maxDepth, err := strconv.Atoi(val)
+		if err != nil {
+			c.MaxDepth = maxDepth
+		}
+	},
+	"PARSE_HTTP_ERROR_RESPONSE": func(c *Collector, val string) {
+		c.ParseHTTPErrorResponse = isYesString(val)
+	},
+	"USER_AGENT": func(c *Collector, val string) {
+		c.UserAgent = val
+	},
+}
+
 // NewCollector creates a new Collector instance with default configuration
-func NewCollector() *Collector {
+func NewCollector(options ...func(*Collector)) *Collector {
 	c := &Collector{}
 	c.Init()
+
+	for _, f := range options {
+		f(c)
+	}
+
+	c.parseSettingsFromEnv()
+
 	return c
+}
+
+// UserAgent sets the user agent used by the Collector.
+func UserAgent(ua string) func(*Collector) {
+	return func(c *Collector) {
+		c.UserAgent = ua
+	}
+}
+
+// MaxDepth limits the recursion depth of visited URLs.
+func MaxDepth(depth int) func(*Collector) {
+	return func(c *Collector) {
+		c.MaxDepth = depth
+	}
+}
+
+// AllowedDomains sets the domain whitelist used by the Collector.
+func AllowedDomains(domains ...string) func(*Collector) {
+	return func(c *Collector) {
+		c.AllowedDomains = domains
+	}
+}
+
+// ParseHTTPErrorResponse allows parsing responses with HTTP errors
+func ParseHTTPErrorResponse() func(*Collector) {
+	return func(c *Collector) {
+		c.ParseHTTPErrorResponse = true
+	}
+}
+
+// DisallowedDomains sets the domain blacklist used by the Collector.
+func DisallowedDomains(domains ...string) func(*Collector) {
+	return func(c *Collector) {
+		c.DisallowedDomains = domains
+	}
+}
+
+// URLFilters sets the list of regular expressions which restricts
+// visiting URLs. If any of the rules matches to a URL the request won't be stopped.
+func URLFilters(filters ...*regexp.Regexp) func(*Collector) {
+	return func(c *Collector) {
+		c.URLFilters = filters
+	}
+}
+
+// AllowURLRevisit instructs the Collector to allow multiple downloads of the same URL
+func AllowURLRevisit() func(*Collector) {
+	return func(c *Collector) {
+		c.AllowURLRevisit = true
+	}
+}
+
+// MaxBodySize sets the limit of the retrieved response body in bytes.
+func MaxBodySize(sizeInBytes int) func(*Collector) {
+	return func(c *Collector) {
+		c.MaxBodySize = sizeInBytes
+	}
+}
+
+// CacheDir specifies the location where GET requests are cached as files.
+func CacheDir(path string) func(*Collector) {
+	return func(c *Collector) {
+		c.CacheDir = path
+	}
+}
+
+// IgnoreRobotsTxt instructs the Collector to ignore any restrictions
+// set by the target host's robots.txt file.
+func IgnoreRobotsTxt() func(*Collector) {
+	return func(c *Collector) {
+		c.IgnoreRobotsTxt = true
+	}
+}
+
+// ID sets the unique identifier of the Collector.
+func ID(id uint32) func(*Collector) {
+	return func(c *Collector) {
+		c.ID = id
+	}
+}
+
+// Async turns on asynchronous network requests.
+func Async(a bool) func(*Collector) {
+	return func(c *Collector) {
+		c.Async = a
+	}
+}
+
+// DetectCharset enables character encoding detection for non-utf8 response bodies
+// without explicit charset declaration. This feature uses https://github.com/saintfish/chardet
+func DetectCharset() func(*Collector) {
+	return func(c *Collector) {
+		c.DetectCharset = true
+	}
+}
+
+// Debugger sets the debugger used by the Collector.
+func Debugger(d debug.Debugger) func(*Collector) {
+	return func(c *Collector) {
+		d.Init()
+		c.debugger = d
+	}
 }
 
 // Init initializes the Collector's private variables and sets default
@@ -136,16 +336,18 @@ func NewCollector() *Collector {
 func (c *Collector) Init() {
 	c.UserAgent = "colly - https://github.com/gocolly/colly"
 	c.MaxDepth = 0
-	c.visitedURLs = make(map[uint64]bool)
+	c.store = &storage.InMemoryStorage{}
+	c.store.Init()
 	c.MaxBodySize = 10 * 1024 * 1024
 	c.backend = &httpBackend{}
-	c.backend.Init()
+	jar, _ := cookiejar.New(nil)
+	c.backend.Init(jar)
 	c.backend.Client.CheckRedirect = c.checkRedirectFunc()
 	c.wg = &sync.WaitGroup{}
 	c.lock = &sync.RWMutex{}
 	c.robotsMap = make(map[string]*robotstxt.RobotsData)
 	c.IgnoreRobotsTxt = true
-	c.Id = atomic.AddUint32(&collectorCounter, 1)
+	c.ID = atomic.AddUint32(&collectorCounter, 1)
 }
 
 // Appengine will replace the Collector's backend http.Client
@@ -212,8 +414,6 @@ func (c *Collector) SetDebugger(d debug.Debugger) {
 }
 
 func (c *Collector) scrape(u, method string, depth int, requestData io.Reader, ctx *Context, hdr http.Header, checkRevisit bool) error {
-	c.wg.Add(1)
-	defer c.wg.Done()
 	if err := c.requestCheck(u, method, depth, checkRevisit); err != nil {
 		return err
 	}
@@ -232,53 +432,80 @@ func (c *Collector) scrape(u, method string, depth int, requestData io.Reader, c
 			return err
 		}
 	}
-	req, err := http.NewRequest(method, parsedURL.String(), requestData)
-	if err != nil {
-		return err
-	}
 	if hdr == nil {
-		req.Header.Set("User-Agent", c.UserAgent)
-		if method == "POST" {
-			req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
-		}
-	} else {
-		req.Header = hdr
+		hdr = http.Header{"User-Agent": []string{c.UserAgent}}
 	}
+	rc, ok := requestData.(io.ReadCloser)
+	if !ok && requestData != nil {
+		rc = ioutil.NopCloser(requestData)
+	}
+	req := &http.Request{
+		Method:     method,
+		URL:        parsedURL,
+		Proto:      "HTTP/1.1",
+		ProtoMajor: 1,
+		ProtoMinor: 1,
+		Header:     hdr,
+		Body:       rc,
+		Host:       parsedURL.Host,
+	}
+	u = parsedURL.String()
+	c.wg.Add(1)
+	if c.Async {
+		go c.fetch(u, method, depth, requestData, ctx, hdr, checkRevisit, req)
+		return nil
+	}
+	return c.fetch(u, method, depth, requestData, ctx, hdr, checkRevisit, req)
+}
+
+func (c *Collector) fetch(u, method string, depth int, requestData io.Reader, ctx *Context, hdr http.Header, checkRevisit bool, req *http.Request) error {
+	defer c.wg.Done()
 	if ctx == nil {
 		ctx = NewContext()
 	}
 	request := &Request{
-		URL:       parsedURL,
+		URL:       req.URL,
 		Headers:   &req.Header,
 		Ctx:       ctx,
 		Depth:     depth,
 		Method:    method,
 		Body:      requestData,
 		collector: c,
-		Id:        atomic.AddUint32(&c.requestCount, 1),
+		ID:        atomic.AddUint32(&c.requestCount, 1),
 	}
 
 	c.handleOnRequest(request)
 
+	if request.abort {
+		return nil
+	}
+
 	if method == "POST" && req.Header.Get("Content-Type") == "" {
 		req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
 	}
+	origURL := req.URL
 	response, err := c.backend.Cache(req, c.MaxBodySize, c.CacheDir)
 	if err := c.handleOnError(response, err, request, ctx); err != nil {
 		return err
 	}
-	if req.URL.String() != parsedURL.String() {
+	if req.URL != origURL {
 		request.URL = req.URL
 		request.Headers = &req.Header
 	}
 	atomic.AddUint32(&c.responseCount, 1)
 	response.Ctx = ctx
 	response.Request = request
-	response.fixCharset(c.DetectCharset)
+
+	err = response.fixCharset(c.DetectCharset, request.ResponseCharacterEncoding)
+	if err != nil {
+		return err
+	}
 
 	c.handleOnResponse(response)
 
 	c.handleOnHTML(response)
+
+	c.handleOnXML(response)
 
 	c.handleOnScraped(response)
 
@@ -308,15 +535,14 @@ func (c *Collector) requestCheck(u, method string, depth int, checkRevisit bool)
 		h := fnv.New64a()
 		h.Write([]byte(u))
 		uHash := h.Sum64()
-		c.lock.RLock()
-		visited := c.visitedURLs[uHash]
-		c.lock.RUnlock()
+		visited, err := c.store.IsVisited(uHash)
+		if err != nil {
+			return err
+		}
 		if visited {
 			return ErrAlreadyVisited
 		}
-		c.lock.Lock()
-		c.visitedURLs[uHash] = true
-		c.lock.Unlock()
+		return c.store.Visited(uHash)
 	}
 	return nil
 }
@@ -425,6 +651,21 @@ func (c *Collector) OnHTML(goquerySelector string, f HTMLCallback) {
 	c.lock.Unlock()
 }
 
+// OnXML registers a function. Function will be executed on every XML
+// element matched by the xpath Query parameter.
+// xpath Query is used by https://github.com/antchfx/xmlquery
+func (c *Collector) OnXML(xpathQuery string, f XMLCallback) {
+	c.lock.Lock()
+	if c.xmlCallbacks == nil {
+		c.xmlCallbacks = make([]*xmlCallbackContainer, 0, 4)
+	}
+	c.xmlCallbacks = append(c.xmlCallbacks, &xmlCallbackContainer{
+		Query:    xpathQuery,
+		Function: f,
+	})
+	c.lock.Unlock()
+}
+
 // OnHTMLDetach deregister a function. Function will not be execute after detached
 func (c *Collector) OnHTMLDetach(goquerySelector string) {
 	c.lock.Lock()
@@ -437,6 +678,22 @@ func (c *Collector) OnHTMLDetach(goquerySelector string) {
 	}
 	if deleteIdx != -1 {
 		c.htmlCallbacks = append(c.htmlCallbacks[:deleteIdx], c.htmlCallbacks[deleteIdx+1:]...)
+	}
+	c.lock.Unlock()
+}
+
+// OnXMLDetach deregister a function. Function will not be execute after detached
+func (c *Collector) OnXMLDetach(xpathQuery string) {
+	c.lock.Lock()
+	deleteIdx := -1
+	for i, cc := range c.xmlCallbacks {
+		if cc.Query == xpathQuery {
+			deleteIdx = i
+			break
+		}
+	}
+	if deleteIdx != -1 {
+		c.xmlCallbacks = append(c.xmlCallbacks[:deleteIdx], c.xmlCallbacks[deleteIdx+1:]...)
 	}
 	c.lock.Unlock()
 }
@@ -483,6 +740,17 @@ func (c *Collector) SetRequestTimeout(timeout time.Duration) {
 	c.backend.Client.Timeout = timeout
 }
 
+// SetStorage overrides the default in-memory storage.
+// Storage stores scraping related data like cookies and visited urls
+func (c *Collector) SetStorage(s storage.Storage) error {
+	if err := s.Init(); err != nil {
+		return err
+	}
+	c.store = s
+	c.backend.Client.Jar = createJar(s)
+	return nil
+}
+
 // SetProxy sets a proxy for the collector. This method overrides the previously
 // used http.Transport if the type of the transport is not http.RoundTripper.
 // The proxy type is determined by the URL scheme. "http"
@@ -517,10 +785,10 @@ func (c *Collector) SetProxyFunc(p ProxyFunc) {
 	}
 }
 
-func createEvent(eventType string, requestId, collectorId uint32, kvargs map[string]string) *debug.Event {
+func createEvent(eventType string, requestID, collectorID uint32, kvargs map[string]string) *debug.Event {
 	return &debug.Event{
-		CollectorId: collectorId,
-		RequestId:   requestId,
+		CollectorID: collectorID,
+		RequestID:   requestID,
 		Type:        eventType,
 		Values:      kvargs,
 	}
@@ -528,7 +796,7 @@ func createEvent(eventType string, requestId, collectorId uint32, kvargs map[str
 
 func (c *Collector) handleOnRequest(r *Request) {
 	if c.debugger != nil {
-		c.debugger.Event(createEvent("request", r.Id, c.Id, map[string]string{
+		c.debugger.Event(createEvent("request", r.ID, c.ID, map[string]string{
 			"url": r.URL.String(),
 		}))
 	}
@@ -539,7 +807,7 @@ func (c *Collector) handleOnRequest(r *Request) {
 
 func (c *Collector) handleOnResponse(r *Response) {
 	if c.debugger != nil {
-		c.debugger.Event(createEvent("response", r.Request.Id, c.Id, map[string]string{
+		c.debugger.Event(createEvent("response", r.Request.ID, c.ID, map[string]string{
 			"url":    r.Request.URL.String(),
 			"status": http.StatusText(r.StatusCode),
 		}))
@@ -550,7 +818,7 @@ func (c *Collector) handleOnResponse(r *Response) {
 }
 
 func (c *Collector) handleOnHTML(resp *Response) {
-	if !strings.Contains(strings.ToLower(resp.Headers.Get("Content-Type")), "html") || len(c.htmlCallbacks) == 0 {
+	if len(c.htmlCallbacks) == 0 || !strings.Contains(strings.ToLower(resp.Headers.Get("Content-Type")), "html") {
 		return
 	}
 	doc, err := goquery.NewDocumentFromReader(bytes.NewBuffer(resp.Body))
@@ -562,7 +830,7 @@ func (c *Collector) handleOnHTML(resp *Response) {
 			for _, n := range s.Nodes {
 				e := NewHTMLElementFromSelectionNode(resp, s, n)
 				if c.debugger != nil {
-					c.debugger.Event(createEvent("html", resp.Request.Id, c.Id, map[string]string{
+					c.debugger.Event(createEvent("html", resp.Request.ID, c.ID, map[string]string{
 						"selector": cc.Selector,
 						"url":      resp.Request.URL.String(),
 					}))
@@ -573,8 +841,56 @@ func (c *Collector) handleOnHTML(resp *Response) {
 	}
 }
 
+func (c *Collector) handleOnXML(resp *Response) {
+	if len(c.xmlCallbacks) == 0 {
+		return
+	}
+	contentType := strings.ToLower(resp.Headers.Get("Content-Type"))
+	if !strings.Contains(contentType, "html") && !strings.Contains(contentType, "xml") {
+		return
+	}
+
+	if strings.Contains(contentType, "html") {
+		doc, err := htmlquery.Parse(bytes.NewBuffer(resp.Body))
+		if err != nil {
+			return
+		}
+
+		for _, cc := range c.xmlCallbacks {
+			htmlquery.FindEach(doc, cc.Query, func(i int, n *html.Node) {
+				e := NewXMLElementFromHTMLNode(resp, n)
+				if c.debugger != nil {
+					c.debugger.Event(createEvent("xml", resp.Request.ID, c.ID, map[string]string{
+						"selector": cc.Query,
+						"url":      resp.Request.URL.String(),
+					}))
+				}
+				cc.Function(e)
+			})
+		}
+	} else if strings.Contains(contentType, "xml") {
+		doc, err := xmlquery.Parse(bytes.NewBuffer(resp.Body))
+		if err != nil {
+			return
+		}
+
+		for _, cc := range c.xmlCallbacks {
+			xmlquery.FindEach(doc, cc.Query, func(i int, n *xmlquery.Node) {
+				e := NewXMLElementFromXMLNode(resp, n)
+				if c.debugger != nil {
+					c.debugger.Event(createEvent("xml", resp.Request.ID, c.ID, map[string]string{
+						"selector": cc.Query,
+						"url":      resp.Request.URL.String(),
+					}))
+				}
+				cc.Function(e)
+			})
+		}
+	}
+}
+
 func (c *Collector) handleOnError(response *Response, err error, request *Request, ctx *Context) error {
-	if err == nil && response.StatusCode < 203 {
+	if err == nil && (c.ParseHTTPErrorResponse || response.StatusCode < 203) {
 		return nil
 	}
 	if err == nil {
@@ -587,13 +903,16 @@ func (c *Collector) handleOnError(response *Response, err error, request *Reques
 		}
 	}
 	if c.debugger != nil {
-		c.debugger.Event(createEvent("error", request.Id, c.Id, map[string]string{
+		c.debugger.Event(createEvent("error", request.ID, c.ID, map[string]string{
 			"url":    request.URL.String(),
 			"status": http.StatusText(response.StatusCode),
 		}))
 	}
 	if response.Request == nil {
 		response.Request = request
+	}
+	if response.Ctx == nil {
+		response.Ctx = request.Ctx
 	}
 	for _, f := range c.errorCallbacks {
 		f(response, err)
@@ -603,7 +922,7 @@ func (c *Collector) handleOnError(response *Response, err error, request *Reques
 
 func (c *Collector) handleOnScraped(r *Response) {
 	if c.debugger != nil {
-		c.debugger.Event(createEvent("scraped", r.Request.Id, c.Id, map[string]string{
+		c.debugger.Event(createEvent("scraped", r.Request.ID, c.ID, map[string]string{
 			"url": r.Request.URL.String(),
 		}))
 	}
@@ -652,25 +971,32 @@ func (c *Collector) Cookies(URL string) []*http.Cookie {
 // between collectors.
 func (c *Collector) Clone() *Collector {
 	return &Collector{
-		AllowedDomains:    c.AllowedDomains,
-		CacheDir:          c.CacheDir,
-		DisallowedDomains: c.DisallowedDomains,
-		Id:                atomic.AddUint32(&collectorCounter, 1),
-		IgnoreRobotsTxt:   c.IgnoreRobotsTxt,
-		MaxBodySize:       c.MaxBodySize,
-		MaxDepth:          c.MaxDepth,
-		URLFilters:        c.URLFilters,
-		UserAgent:         c.UserAgent,
-		backend:           c.backend,
-		debugger:          c.debugger,
-		errorCallbacks:    make([]ErrorCallback, 0, 8),
-		htmlCallbacks:     make([]*htmlCallbackContainer, 0, 8),
-		lock:              c.lock,
-		requestCallbacks:  make([]RequestCallback, 0, 8),
-		responseCallbacks: make([]ResponseCallback, 0, 8),
-		robotsMap:         c.robotsMap,
-		visitedURLs:       make(map[uint64]bool),
-		wg:                c.wg,
+		AllowedDomains:         c.AllowedDomains,
+		AllowURLRevisit:        c.AllowURLRevisit,
+		CacheDir:               c.CacheDir,
+		DetectCharset:          c.DetectCharset,
+		DisallowedDomains:      c.DisallowedDomains,
+		ID:                     atomic.AddUint32(&collectorCounter, 1),
+		IgnoreRobotsTxt:        c.IgnoreRobotsTxt,
+		MaxBodySize:            c.MaxBodySize,
+		MaxDepth:               c.MaxDepth,
+		URLFilters:             c.URLFilters,
+		ParseHTTPErrorResponse: c.ParseHTTPErrorResponse,
+		UserAgent:              c.UserAgent,
+		store:                  c.store,
+		backend:                c.backend,
+		debugger:               c.debugger,
+		Async:                  c.Async,
+		RedirectHandler:        c.RedirectHandler,
+		errorCallbacks:         make([]ErrorCallback, 0, 8),
+		htmlCallbacks:          make([]*htmlCallbackContainer, 0, 8),
+		xmlCallbacks:           make([]*xmlCallbackContainer, 0, 8),
+		scrapedCallbacks:       make([]ScrapedCallback, 0, 8),
+		lock:                   c.lock,
+		requestCallbacks:       make([]RequestCallback, 0, 8),
+		responseCallbacks:      make([]ResponseCallback, 0, 8),
+		robotsMap:              c.robotsMap,
+		wg:                     c.wg,
 	}
 }
 
@@ -678,6 +1004,10 @@ func (c *Collector) checkRedirectFunc() func(req *http.Request, via []*http.Requ
 	return func(req *http.Request, via []*http.Request) error {
 		if !c.isDomainAllowed(req.URL.Host) {
 			return fmt.Errorf("Not following redirect to %s because its not in AllowedDomains", req.URL.Host)
+		}
+
+		if c.RedirectHandler != nil {
+			return c.RedirectHandler(req, via)
 		}
 
 		// Honor golangs default of maximum of 10 redirects
@@ -700,6 +1030,20 @@ func (c *Collector) checkRedirectFunc() func(req *http.Request, via []*http.Requ
 		}
 
 		return nil
+	}
+}
+
+func (c *Collector) parseSettingsFromEnv() {
+	for _, e := range os.Environ() {
+		if !strings.HasPrefix(e, "COLLY_") {
+			continue
+		}
+		pair := strings.SplitN(e[6:], "=", 2)
+		if f, ok := envMap[pair[0]]; ok {
+			f(c, pair[1])
+		} else {
+			log.Println("Unknown environment variable:", pair[0])
+		}
 	}
 }
 
@@ -753,4 +1097,52 @@ func randomBoundary() string {
 		panic(err)
 	}
 	return fmt.Sprintf("%x", buf[:])
+}
+
+func isYesString(s string) bool {
+	switch strings.ToLower(s) {
+	case "1", "yes", "true", "y":
+		return true
+	}
+	return false
+}
+
+func createJar(s storage.Storage) http.CookieJar {
+	return &cookieJarSerializer{store: s, lock: &sync.RWMutex{}}
+}
+
+func (j *cookieJarSerializer) SetCookies(u *url.URL, cookies []*http.Cookie) {
+	j.lock.Lock()
+	defer j.lock.Unlock()
+	cookieStr := j.store.Cookies(u)
+
+	// Merge existing cookies, new cookies have precedence.
+	cnew := make([]*http.Cookie, len(cookies))
+	copy(cnew, cookies)
+	existing := storage.UnstringifyCookies(cookieStr)
+	for _, c := range existing {
+		if !storage.ContainsCookie(cnew, c.Name) {
+			cnew = append(cnew, c)
+		}
+	}
+	j.store.SetCookies(u, storage.StringifyCookies(cnew))
+}
+
+func (j *cookieJarSerializer) Cookies(u *url.URL) []*http.Cookie {
+	cookies := storage.UnstringifyCookies(j.store.Cookies(u))
+	// Filter.
+	now := time.Now()
+	cnew := make([]*http.Cookie, 0, len(cookies))
+	for _, c := range cookies {
+		// Drop expired cookies.
+		if c.RawExpires != "" && c.Expires.Before(now) {
+			continue
+		}
+		// Drop secure cookies if not over https.
+		if c.Secure && u.Scheme != "https" {
+			continue
+		}
+		cnew = append(cnew, c)
+	}
+	return cnew
 }

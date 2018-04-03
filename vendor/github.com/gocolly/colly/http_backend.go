@@ -1,3 +1,17 @@
+// Copyright 2018 Adam Tauber
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//      http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 package colly
 
 import (
@@ -8,7 +22,6 @@ import (
 	"io/ioutil"
 	"math/rand"
 	"net/http"
-	"net/http/cookiejar"
 	"os"
 	"path"
 	"regexp"
@@ -76,10 +89,8 @@ func (r *LimitRule) Init() error {
 	return nil
 }
 
-func (h *httpBackend) Init() {
+func (h *httpBackend) Init(jar http.CookieJar) {
 	rand.Seed(time.Now().UnixNano())
-	h.LimitRules = make([]*LimitRule, 0, 8)
-	jar, _ := cookiejar.New(nil)
 	h.Client = &http.Client{
 		Jar:     jar,
 		Timeout: 10 * time.Second,
@@ -100,6 +111,9 @@ func (r *LimitRule) Match(domain string) bool {
 }
 
 func (h *httpBackend) GetMatchingRule(domain string) *LimitRule {
+	if h.LimitRules == nil {
+		return nil
+	}
 	h.lock.RLock()
 	defer h.lock.RUnlock()
 	for _, r := range h.LimitRules {
@@ -139,10 +153,11 @@ func (h *httpBackend) Cache(request *http.Request, bodySize int, cacheDir string
 	if err != nil {
 		return resp, err
 	}
-	defer file.Close()
 	if err := gob.NewEncoder(file).Encode(resp); err != nil {
+		file.Close()
 		return resp, err
 	}
+	file.Close()
 	return resp, os.Rename(filename+"~", filename)
 }
 
@@ -184,6 +199,9 @@ func (h *httpBackend) Do(request *http.Request, bodySize int) (*Response, error)
 
 func (h *httpBackend) Limit(rule *LimitRule) error {
 	h.lock.Lock()
+	if h.LimitRules == nil {
+		h.LimitRules = make([]*LimitRule, 0, 8)
+	}
 	h.LimitRules = append(h.LimitRules, rule)
 	h.lock.Unlock()
 	return rule.Init()

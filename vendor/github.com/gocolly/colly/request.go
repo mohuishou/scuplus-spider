@@ -1,3 +1,17 @@
+// Copyright 2018 Adam Tauber
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//      http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 package colly
 
 import (
@@ -22,9 +36,19 @@ type Request struct {
 	Method string
 	// Body is the request body which is used on POST/PUT requests
 	Body io.Reader
-	// Unique identifier of the request
-	Id        uint32
+	// ResponseCharacterencoding is the character encoding of the response body.
+	// Leave it blank to allow automatic character encoding of the response body.
+	// It is empty by default and it can be set in OnRequest callback.
+	ResponseCharacterEncoding string
+	// ID is the Unique identifier of the request
+	ID        uint32
 	collector *Collector
+	abort     bool
+}
+
+// Abort cancels the HTTP request when called in an OnRequest callback
+func (r *Request) Abort() {
+	r.abort = true
 }
 
 // AbsoluteURL returns with the resolved absolute URL of an URL chunk.
