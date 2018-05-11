@@ -84,7 +84,9 @@ func Spider(maxTryNum int, key string) {
 		createdAt := spider.StrToTime("2006-01-02", createdStr)
 
 		// 获取正文
-		content := e.ChildText("div.page-content") + e.ChildText("div.fj-main")
+		content, _ := e.DOM.Find("div.page-content").Html()
+		attachment, _ := e.DOM.Find("div.fj-main").Html()
+		content = content + attachment
 
 		// 获取标签
 		tagIDs := spider.GetTagIDs(title, []string{category, key})
