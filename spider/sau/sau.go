@@ -34,7 +34,7 @@ func Spider(maxTryNum int, key string) {
 	// 获取最后一条数据的时间
 	detail := model.GetLastDetail(category, key)
 	// 获取列表页面的所有列表
-	c.OnHTML("body > table > tbody > tr:nth-child(3) > td > table > tbody > tr:nth-child(3) > td > table > tbody > tr", func(e *colly.HTMLElement) {
+	c.OnHTML("body > table > tbody > tr:nth-child(3) > td > table > tbody > tr:nth-child(3) > td > table  tr", func(e *colly.HTMLElement) {
 
 		if e.ChildText("td:nth-child(2)") == "" {
 			return
