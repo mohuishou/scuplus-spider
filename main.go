@@ -7,6 +7,7 @@ import (
 	"github.com/mohuishou/scuplus-spider/spider/gs"
 	"github.com/mohuishou/scuplus-spider/spider/jwc"
 	"github.com/mohuishou/scuplus-spider/spider/jy"
+	"github.com/mohuishou/scuplus-spider/spider/lecture"
 	"github.com/mohuishou/scuplus-spider/spider/lj"
 	"github.com/mohuishou/scuplus-spider/spider/news"
 	"github.com/mohuishou/scuplus-spider/spider/sau"
@@ -54,6 +55,8 @@ func main() {
 		lj.Run()
 		// 华西临床医学院
 		clinical.Run()
+		// 学术报告
+		lecture.Spider()
 	})
 	c.Start()
 	select {}

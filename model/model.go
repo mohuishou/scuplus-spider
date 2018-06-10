@@ -1,10 +1,11 @@
 package model
 
 import (
-	"fmt"
 	"time"
 
 	"github.com/mohuishou/scuplus-spider/config"
+
+	"fmt"
 
 	"github.com/jinzhu/gorm"
 	_ "github.com/jinzhu/gorm/dialects/mysql" // mysql驱动
@@ -28,12 +29,23 @@ func initDB() {
 
 	// 初始化连接
 	var err error
-	db, err = gorm.Open("mysql", fmt.Sprintf("%s:%s@tcp(%s:%s)/%s?charset=utf8&parseTime=True&loc=Local", conf.User, conf.Password, conf.Host, conf.Port, conf.DB))
+	loc := "Local"
+	dsn := fmt.Sprintf(
+		"%s:%s@tcp(%s:%s)/%s?charset=utf8&parseTime=True&loc=%s",
+		conf.User,
+		conf.Password,
+		conf.Host,
+		conf.Port,
+		conf.DB,
+		loc,
+	)
+
+	db, err = gorm.Open("mysql", dsn)
 	if err != nil {
 		log.Fatal("数据库连接错误：", err, conf)
 	}
 	db.DB().SetMaxOpenConns(20)
-	db.AutoMigrate(&DetailTag{}, &Detail{}, &Tag{})
+	db.AutoMigrate(&DetailTag{}, &Detail{}, &Tag{}, &Lecture{})
 }
 
 // DB 返回db，如果不存在则初始化
