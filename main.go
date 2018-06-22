@@ -31,7 +31,7 @@ func main() {
 		// 学工部
 		xsc.Run()
 		// 四川大学新闻网
-		news.Run()
+		// news.Run()
 	})
 	// 从早上七点半开始每两小时抓取一次
 	c.AddFunc("0 30 7/2 * * ? ", func() {
