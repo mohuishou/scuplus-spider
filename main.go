@@ -9,7 +9,6 @@ import (
 	"github.com/mohuishou/scuplus-spider/spider/jy"
 	"github.com/mohuishou/scuplus-spider/spider/lecture"
 	"github.com/mohuishou/scuplus-spider/spider/lj"
-	"github.com/mohuishou/scuplus-spider/spider/news"
 	"github.com/mohuishou/scuplus-spider/spider/sau"
 	"github.com/mohuishou/scuplus-spider/spider/seei"
 	"github.com/mohuishou/scuplus-spider/spider/sesu"
